@@ -147,6 +147,11 @@ cd lens-tutorial
    - containers (для Map и Set)
    - text (для работы с Text)
    - vector (для работы с Vector)
+   - network (для примеров с сетевым вводом-выводом)
+   - bytestring (для примеров с бинарным вводом-выводом)
+   - async (для примеров с асинхронным вводом-выводом)
+   - directory (для примеров с файловой системой)
+   - time (для примеров с логированием и профилированием)
 
 ### Установка GHC
 
@@ -169,10 +174,10 @@ cd haskell-tutorial
 cabal init
 
 # Отредактируйте файл .cabal, добавив зависимости
-# build-depends: base, lens, containers, text, vector
+# build-depends: base, lens, containers, text, vector, network, bytestring, async, directory, time
 
 # Установите зависимости
-cabal install --lib lens containers text vector
+cabal install --lib lens containers text vector network bytestring async directory time
 ```
 
 #### Используя Stack
@@ -189,9 +194,14 @@ cd haskell-tutorial
 # - containers
 # - text
 # - vector
+# - network
+# - bytestring
+# - async
+# - directory
+# - time
 
 # Установите зависимости
-stack install lens containers text vector
+stack install lens containers text vector network bytestring async directory time
 ```
 
 ### Запуск примеров без установки библиотек
@@ -201,6 +211,9 @@ stack install lens containers text vector
 ```bash
 # Для примеров с функторами
 ghci -XNoImplicitPrelude functor-tutorial/01_IntroToFunctors.hs
+
+# Для примеров с вводом-выводом
+ghci -package network -package bytestring -package async -package directory -package time io-tutorial/05_NetworkIO.hs
 
 # Для примеров с линзами
 ghci -package lens -package containers -package text -package vector lens-tutorial/01_IntroToLenses.hs
