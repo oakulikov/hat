@@ -67,7 +67,7 @@ case $example_num in
     ;;
   11)
     file="11_AdvancedOptics.hs"
-    ghc_opts=""
+    ghc_opts="-package lens -package mtl -package containers"
     ;;
   12)
     file="12_PerformanceOptimization.hs"
