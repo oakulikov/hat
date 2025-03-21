@@ -4,7 +4,7 @@
 
 ## Структура репозитория
 
-Репозиторий содержит шесть основных учебных курсов:
+Репозиторий содержит семь основных учебных курсов:
 
 ### 1. Основы Haskell (haskell-basics-tutorial/)
 
@@ -75,6 +75,23 @@
 - [Практическое применение линз](lens-tutorial/05_PracticalLenses.hs) - Реальные примеры использования линз
 - [Призмы и траверсалы](lens-tutorial/06_PrismsAndTraversals.hs) - Другие оптики, связанные с линзами
 
+### 7. Продвинутый учебник по Haskell (advanced-haskell-tutorial/)
+
+Продвинутые темы языка Haskell для тех, кто уже освоил основы и хочет углубить свои знания.
+
+- [Обобщенные алгебраические типы данных (GADTs)](advanced-haskell-tutorial/01_GADTs.hs) - Расширенные возможности алгебраических типов данных
+- [Программирование на уровне типов](advanced-haskell-tutorial/02_TypeLevelProgramming.hs) - Вычисления на уровне типов
+- [Зависимые типы](advanced-haskell-tutorial/03_DependentTypes.hs) - Эмуляция зависимых типов в Haskell
+- [Продвинутые классы типов](advanced-haskell-tutorial/04_AdvancedTypeClasses.hs) - Многопараметрические классы типов, функциональные зависимости
+- [Free монады](advanced-haskell-tutorial/05_FreeMonads.hs) - Построение монад из функторов
+- [Расширяемые эффекты](advanced-haskell-tutorial/06_ExtensibleEffects.hs) - Альтернатива трансформерам монад
+- [Монадические морфизмы](advanced-haskell-tutorial/07_MonadMorphisms.hs) - Преобразования между монадами
+- [Коммонады](advanced-haskell-tutorial/08_Comonads.hs) - Двойственность к монадам
+- [Продвинутая рекурсия](advanced-haskell-tutorial/09_AdvancedRecursion.hs) - Схемы рекурсии и катаморфизмы
+- [Продвинутые функторы](advanced-haskell-tutorial/10_AdvancedFunctors.hs) - Бифункторы, профункторы и другие вариации
+- [Продвинутое использование оптики](advanced-haskell-tutorial/11_AdvancedOptics.hs) - Глубокое погружение в линзы, призмы и траверсалы
+- [Оптимизация производительности](advanced-haskell-tutorial/12_PerformanceOptimization.hs) - Техники оптимизации Haskell-программ
+
 ## Иерархия типовых классов в Haskell
 
 Функциональное программирование в Haskell основано на нескольких ключевых абстракциях, которые образуют иерархию типовых классов:
@@ -135,6 +152,10 @@ cd io-tutorial
 # Для запуска примера из учебника по линзам
 cd lens-tutorial
 ./run-example.sh 1  # Запустит пример из 01_IntroToLenses.hs
+
+# Для запуска примера из продвинутого учебника по Haskell
+cd advanced-haskell-tutorial
+./run-example.sh 1  # Запустит пример из 01_GADTs.hs
 ```
 
 ## Требования
@@ -177,7 +198,7 @@ cabal init
 # build-depends: base, lens, containers, text, vector, network, bytestring, async, directory, time
 
 # Установите зависимости
-cabal install --lib lens containers text vector network bytestring async directory time
+cabal install --lib lens containers text vector network bytestring async directory time deepseq ghc-prim parallel mtl
 ```
 
 #### Используя Stack
@@ -199,9 +220,13 @@ cd haskell-tutorial
 # - async
 # - directory
 # - time
+# - deepseq
+# - ghc-prim
+# - parallel
+# - mtl
 
 # Установите зависимости
-stack install lens containers text vector network bytestring async directory time
+stack install lens containers text vector network bytestring async directory time deepseq ghc-prim parallel mtl
 ```
 
 ### Запуск примеров без установки библиотек
@@ -217,6 +242,9 @@ ghci -package network -package bytestring -package async -package directory -pac
 
 # Для примеров с линзами
 ghci -package lens -package containers -package text -package vector lens-tutorial/01_IntroToLenses.hs
+
+# Для продвинутых примеров
+ghci -package deepseq -package time -package ghc-prim -package bytestring -package text -package vector -package parallel -package lens -package mtl -package containers advanced-haskell-tutorial/12_PerformanceOptimization.hs
 ```
 
 ### Примечание о зависимостях
@@ -229,6 +257,7 @@ ghci -package lens -package containers -package text -package vector lens-tutori
 4. **Примеры с монадами** (monad-tutorial/) - не требуют дополнительных библиотек, используют только стандартную библиотеку Haskell.
 5. **Примеры с вводом-выводом** (io-tutorial/) - некоторые примеры могут требовать дополнительных библиотек, таких как network и bytestring.
 6. **Примеры с линзами** (lens-tutorial/) - требуют установки библиотеки lens и других зависимостей.
+7. **Продвинутые примеры** (advanced-haskell-tutorial/) - требуют установки различных библиотек, включая deepseq, time, ghc-prim, bytestring, text, vector, parallel, lens, mtl и containers.
 
 Если у вас возникают проблемы с запуском примеров с линзами, вы можете сосредоточиться на примерах с основами Haskell, функторами, аппликативными функторами и монадами, которые не требуют дополнительных библиотек.
 
