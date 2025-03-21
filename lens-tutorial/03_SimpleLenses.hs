@@ -1,8 +1,7 @@
 {-
-  Стандартные линзы (без использования внешних библиотек)
+  Простая реализация линз в Haskell
   
-  В этом файле мы рассмотрим, как использовать нашу собственную реализацию линз
-  для работы с различными структурами данных.
+  В этом файле мы рассмотрим, как использовать линзы для работы с вложенными структурами данных.
 -}
 
 module Main where
@@ -10,9 +9,8 @@ module Main where
 import qualified Data.Map as Map
 import Data.Char (toUpper)
 import Data.Maybe (fromMaybe)
-import Prelude hiding (traverse, floor)
 
--- Реализация линз без использования внешних библиотек
+-- Реализация линз
 -- Линза - это комбинация геттера и сеттера для поля структуры данных
 data Lens s a = Lens
   { view :: s -> a           -- Функция для получения значения
@@ -35,12 +33,20 @@ s ^. lens = view lens s
 (%~) :: Lens s a -> (a -> a) -> s -> s
 (%~) = over
 
--- Оператор для композиции линз
+-- Композиция линз
 (%.%) :: Lens a b -> Lens b c -> Lens a c
 (%.%) outer inner = Lens
   { view = \s -> view inner (view outer s)
   , over = \f s -> over outer (over inner f) s
   }
+
+-- Функция для получения значения через цепочку линз
+viewThrough :: s -> Lens s a -> Lens a b -> b
+viewThrough s l1 l2 = view l2 (view l1 s)
+
+-- Функция для получения значения через цепочку из трех линз
+viewThrough3 :: s -> Lens s a -> Lens a b -> Lens b c -> c
+viewThrough3 s l1 l2 l3 = view l3 (view l2 (view l1 s))
 
 -- Оператор для цепочки модификаций
 (&) :: s -> (s -> t) -> t
@@ -56,8 +62,8 @@ ix i = Lens
   }
 
 -- Линза для обхода всех элементов структуры
-traverse :: Lens [a] a
-traverse = Lens
+traverseL :: Lens [a] a
+traverseL = Lens
   { view = \xs -> if null xs then error "Empty list" else head xs
   , over = \f -> map f
   }
@@ -116,11 +122,6 @@ both = Lens
 (?~) :: Lens s (Maybe a) -> a -> s -> s
 (?~) lens value = set lens (Just value)
 
--- Функция для автоматического создания линз для структур данных
--- Это упрощенная версия makeLenses из библиотеки lens
-makeLenses :: String -> String
-makeLenses typeName = "Линзы для " ++ typeName ++ " созданы"
-
 -- Определим несколько структур данных для примеров
 data Person = Person
   { _name :: String
@@ -134,19 +135,6 @@ data Address = Address
   { _street :: String
   , _city :: String
   , _zipCode :: String
-  } deriving (Show, Eq)
-
--- Дополнительные структуры данных для примера 5
-data Department = Department
-  { _departmentName :: String
-  , _employees :: [Person]
-  , _location :: Location
-  } deriving (Show, Eq)
-
-data Location = Location
-  { _building :: String
-  , _floor :: Int
-  , _room :: Int
   } deriving (Show, Eq)
 
 -- Создадим линзы для структуры Person
@@ -199,6 +187,135 @@ zipCode = Lens
   , over = \f a -> a { _zipCode = f (_zipCode a) }
   }
 
+-- Пример данных
+sampleAddress :: Address
+sampleAddress = Address
+  { _street = "ул. Ленина, 10"
+  , _city = "Москва"
+  , _zipCode = "123456"
+  }
+
+samplePerson :: Person
+samplePerson = Person
+  { _name = "Иван Иванов"
+  , _age = 30
+  , _address = sampleAddress
+  , _hobbies = ["чтение", "программирование", "путешествия"]
+  , _contacts = Map.fromList [("email", "ivan@example.com"), ("phone", "+7 123 456 7890")]
+  }
+
+-- Пример 1: Базовые операции с линзами
+example1 :: IO ()
+example1 = do
+  putStrLn "Пример 1: Базовые операции с линзами"
+  
+  -- Получение значения через линзу
+  putStrLn $ "Имя: " ++ (samplePerson ^. name)
+  putStrLn $ "Возраст: " ++ show (samplePerson ^. age)
+  putStrLn $ "Город: " ++ viewThrough samplePerson address city
+  
+  -- Установка значения через линзу
+  let updatedPerson = samplePerson & (name .~ "Петр Петров")
+                                   & (age .~ 35)
+                                   & (address %.% city .~ "Санкт-Петербург")
+  
+  putStrLn $ "\nОбновленные данные:"
+  putStrLn $ "Имя: " ++ (updatedPerson ^. name)
+  putStrLn $ "Возраст: " ++ show (updatedPerson ^. age)
+  putStrLn $ "Город: " ++ viewThrough updatedPerson address city
+  
+  -- Модификация значения через линзу
+  let olderPerson = samplePerson & (age %~ (+5))
+                                & (address %.% street %~ (++ ", кв. 5"))
+  
+  putStrLn $ "\nМодифицированные данные:"
+  putStrLn $ "Возраст после увеличения на 5: " ++ show (olderPerson ^. age)
+  putStrLn $ "Улица после добавления квартиры: " ++ viewThrough olderPerson address street
+
+-- Пример 2: Работа со списками
+example2 :: IO ()
+example2 = do
+  putStrLn "\nПример 2: Работа со списками"
+  
+  -- Получение элемента списка по индексу
+  putStrLn $ "Первое хобби: " ++ viewThrough samplePerson hobbies (ix 0)
+  
+  -- Модификация элемента списка по индексу
+  let updatedHobbies = samplePerson & (hobbies %.% ix 1 .~ "функциональное программирование")
+  putStrLn $ "Обновленное второе хобби: " ++ viewThrough updatedHobbies hobbies (ix 1)
+  
+  -- Добавление элемента в список
+  let moreHobbies = samplePerson & (hobbies %~ (++ ["музыка"]))
+  putStrLn $ "Список хобби после добавления: " ++ show (moreHobbies ^. hobbies)
+  
+  -- Фильтрация списка
+  let filteredHobbies = samplePerson & (hobbies %~ filter (\h -> length h > 10))
+  putStrLn $ "Отфильтрованный список хобби (длина > 10): " ++ show (filteredHobbies ^. hobbies)
+  
+  -- Преобразование каждого элемента списка
+  let capitalizedHobbies = samplePerson & (hobbies %.% traverseL %~ capitalize)
+        where capitalize (c:cs) = toUpperRussian c : cs
+              capitalize [] = []
+              toUpperRussian c 
+                | c >= 'а' && c <= 'я' = toEnum (fromEnum c - fromEnum 'а' + fromEnum 'А')
+                | c >= 'a' && c <= 'z' = toUpper c
+                | otherwise = c
+  
+  putStrLn $ "Список хобби с заглавными буквами: " ++ show (capitalizedHobbies ^. hobbies)
+
+-- Пример 3: Работа с Map
+example3 :: IO ()
+example3 = do
+  putStrLn "\nПример 3: Работа с Map"
+  
+  -- Получение значения по ключу
+  putStrLn $ "Email: " ++ fromMaybe "не указан" (viewThrough samplePerson contacts (at "email"))
+  putStrLn $ "Skype: " ++ fromMaybe "не указан" (viewThrough samplePerson contacts (at "skype"))
+  
+  -- Добавление нового ключа-значения
+  let updatedContacts = samplePerson & (contacts %.% at "telegram" ?~ "@ivan")
+  putStrLn $ "Telegram после добавления: " ++ fromMaybe "не указан" (viewThrough updatedContacts contacts (at "telegram"))
+  
+  -- Удаление ключа
+  let lessContacts = samplePerson & (contacts %.% at "phone" .~ Nothing)
+  putStrLn $ "Телефон после удаления: " ++ fromMaybe "не указан" (viewThrough lessContacts contacts (at "phone"))
+  
+  -- Модификация значения по ключу
+  let modifiedContacts = samplePerson & (contacts %.% at "email" %~ fmap (++ ".ru"))
+  putStrLn $ "Email после модификации: " ++ fromMaybe "не указан" (viewThrough modifiedContacts contacts (at "email"))
+
+-- Пример 4: Условные операции
+example4 :: IO ()
+example4 = do
+  putStrLn "\nПример 4: Условные операции"
+  
+  -- Условная модификация
+  let conditionalUpdate = samplePerson & (age %.% filtered (< 40) %~ (+10))
+                                      & (age %.% filtered (>= 40) %~ subtract 5)
+  
+  putStrLn $ "Возраст после условной модификации: " ++ show (conditionalUpdate ^. age)
+  
+  -- Проверка условия
+  putStrLn $ "Возраст меньше 40? " ++ show (has (age %.% filtered (< 40)) samplePerson)
+  putStrLn $ "Возраст больше 50? " ++ show (has (age %.% filtered (> 50)) samplePerson)
+  
+  -- Условная установка
+  let conditionalSet = samplePerson & (address %.% city %~ (\c -> if c == "Москва" then "Москва (столица)" else c))
+  putStrLn $ "Город после условной установки: " ++ viewThrough conditionalSet address city
+
+-- Дополнительные структуры данных для примера 5
+data Department = Department
+  { _departmentName :: String
+  , _employees :: [Person]
+  , _location :: Location
+  } deriving (Show, Eq)
+
+data Location = Location
+  { _building :: String
+  , _floor :: Int
+  , _room :: Int
+  } deriving (Show, Eq)
+
 -- Создадим линзы для структуры Department
 departmentName :: Lens Department String
 departmentName = Lens
@@ -225,8 +342,8 @@ building = Lens
   , over = \f l -> l { _building = f (_building l) }
   }
 
-floor :: Lens Location Int
-floor = Lens
+floorL :: Lens Location Int
+floorL = Lens
   { view = _floor
   , over = \f l -> l { _floor = f (_floor l) }
   }
@@ -236,127 +353,6 @@ room = Lens
   { view = _room
   , over = \f l -> l { _room = f (_room l) }
   }
-
--- Пример данных
-sampleAddress :: Address
-sampleAddress = Address
-  { _street = "ул. Ленина, 10"
-  , _city = "Москва"
-  , _zipCode = "123456"
-  }
-
-samplePerson :: Person
-samplePerson = Person
-  { _name = "Иван Иванов"
-  , _age = 30
-  , _address = sampleAddress
-  , _hobbies = ["чтение", "программирование", "путешествия"]
-  , _contacts = Map.fromList [("email", "ivan@example.com"), ("phone", "+7 123 456 7890")]
-  }
-
--- Пример 1: Базовые операции с линзами
-example1 :: IO ()
-example1 = do
-  putStrLn "Пример 1: Базовые операции с линзами"
-  
-  -- Получение значения через линзу
-  putStrLn $ "Имя: " ++ (samplePerson ^. name)
-  putStrLn $ "Возраст: " ++ show (samplePerson ^. age)
-  putStrLn $ "Город: " ++ (samplePerson ^. address ^. city)
-  
-  -- Установка значения через линзу
-  let updatedPerson = samplePerson & (name .~ "Петр Петров")
-                                   & (age .~ 35)
-                                   & (address %.% city .~ "Санкт-Петербург")
-  
-  putStrLn $ "\nОбновленные данные:"
-  putStrLn $ "Имя: " ++ (updatedPerson ^. name)
-  putStrLn $ "Возраст: " ++ show (updatedPerson ^. age)
-  putStrLn $ "Город: " ++ (updatedPerson ^. address ^. city)
-  
-  -- Модификация значения через линзу
-  let olderPerson = samplePerson & (age %~ (+5))
-                                & (address %.% street %~ (++ ", кв. 5"))
-  
-  putStrLn $ "\nМодифицированные данные:"
-  putStrLn $ "Возраст после увеличения на 5: " ++ show (olderPerson ^. age)
-  putStrLn $ "Улица после добавления квартиры: " ++ (olderPerson ^. address ^. street)
-
--- Пример 2: Работа со списками
-example2 :: IO ()
-example2 = do
-  putStrLn "\nПример 2: Работа со списками"
-  
-  -- Получение элемента списка по индексу
-  putStrLn $ "Первое хобби: " ++ (samplePerson ^. hobbies ^. ix 0)
-  
-  -- Модификация элемента списка по индексу
-  let updatedHobbies = samplePerson & (hobbies %.% ix 1 .~ "функциональное программирование")
-  putStrLn $ "Обновленное второе хобби: " ++ (updatedHobbies ^. hobbies ^. ix 1)
-  
-  -- Добавление элемента в список
-  let moreHobbies = samplePerson & (hobbies %~ (++ ["музыка"]))
-  putStrLn $ "Список хобби после добавления: " ++ show (moreHobbies ^. hobbies)
-  
-  -- Фильтрация списка
-  let filteredHobbies = samplePerson & (hobbies %~ filter (\h -> length h > 10))
-  putStrLn $ "Отфильтрованный список хобби (длина > 10): " ++ show (filteredHobbies ^. hobbies)
-  
-  -- Преобразование каждого элемента списка
-  let capitalizedHobbies = samplePerson & (hobbies %.% traverse %~ capitalize)
-        where capitalize (c:cs) = toUpperRussian c : cs
-              capitalize [] = []
-              toUpperRussian c 
-                | c >= 'а' && c <= 'я' = toEnum (fromEnum c - fromEnum 'а' + fromEnum 'А')
-                | c >= 'a' && c <= 'z' = toUpper c
-                | otherwise = c
-  
-  putStrLn $ "Список хобби с заглавными буквами: " ++ show (capitalizedHobbies ^. hobbies)
-
--- Пример 3: Работа с Map
-example3 :: IO ()
-example3 = do
-  putStrLn "\nПример 3: Работа с Map"
-  
-  -- Получение значения по ключу
-  let getEmail = fromMaybe "не указан" (samplePerson ^. contacts ^. at "email")
-  let getSkype = fromMaybe "не указан" (samplePerson ^. contacts ^. at "skype")
-  putStrLn $ "Email: " ++ getEmail
-  putStrLn $ "Skype: " ++ getSkype
-  
-  -- Добавление нового ключа-значения
-  let updatedContacts = samplePerson & (contacts %.% at "telegram" ?~ "@ivan")
-  let getTelegram = fromMaybe "не указан" (updatedContacts ^. contacts ^. at "telegram")
-  putStrLn $ "Telegram после добавления: " ++ getTelegram
-  
-  -- Удаление ключа
-  let lessContacts = samplePerson & (contacts %.% at "phone" .~ Nothing)
-  let getPhone = fromMaybe "не указан" (lessContacts ^. contacts ^. at "phone")
-  putStrLn $ "Телефон после удаления: " ++ getPhone
-  
-  -- Модификация значения по ключу
-  let modifiedContacts = samplePerson & (contacts %.% at "email" %~ fmap (++ ".ru"))
-  let getModifiedEmail = fromMaybe "не указан" (modifiedContacts ^. contacts ^. at "email")
-  putStrLn $ "Email после модификации: " ++ getModifiedEmail
-
--- Пример 4: Условные операции
-example4 :: IO ()
-example4 = do
-  putStrLn "\nПример 4: Условные операции"
-  
-  -- Условная модификация
-  let conditionalUpdate = samplePerson & (age %.% filtered (< 40) %~ (+10))
-                                      & (age %.% filtered (>= 40) %~ subtract 5)
-  
-  putStrLn $ "Возраст после условной модификации: " ++ show (conditionalUpdate ^. age)
-  
-  -- Проверка условия
-  putStrLn $ "Возраст меньше 40? " ++ show (has (age %.% filtered (< 40)) samplePerson)
-  putStrLn $ "Возраст больше 50? " ++ show (has (age %.% filtered (> 50)) samplePerson)
-  
-  -- Условная установка
-  let conditionalSet = samplePerson & (address %.% city %~ (\c -> if c == "Москва" then "Москва (столица)" else c))
-  putStrLn $ "Город после условной установки: " ++ (conditionalSet ^. address ^. city)
 
 -- Пример 5: Работа с вложенными структурами
 example5 :: IO ()
@@ -376,19 +372,19 @@ example5 = do
   
   -- Получение данных из вложенных структур
   putStrLn $ "Название отдела: " ++ (department ^. departmentName)
-  putStrLn $ "Имя первого сотрудника: " ++ (department ^. employees ^. ix 0 ^. name)
-  putStrLn $ "Возраст второго сотрудника: " ++ show (department ^. employees ^. ix 1 ^. age)
-  putStrLn $ "Здание: " ++ (department ^. location ^. building)
-  putStrLn $ "Этаж: " ++ show (department ^. location ^. floor)
+  putStrLn $ "Имя первого сотрудника: " ++ viewThrough3 department employees (ix 0) name
+  putStrLn $ "Возраст второго сотрудника: " ++ show (viewThrough3 department employees (ix 1) age)
+  putStrLn $ "Здание: " ++ viewThrough department location building
+  putStrLn $ "Этаж: " ++ show (viewThrough department location floorL)
   
   -- Модификация вложенных структур
-  let updatedDepartment = department & (employees %.% traverse %.% age %~ (+1))
+  let updatedDepartment = department & (employees %.% traverseL %.% age %~ (+1))
                                     & (location %.% room .~ 101)
   
   putStrLn $ "\nПосле модификации:"
-  putStrLn $ "Возраст первого сотрудника: " ++ show (updatedDepartment ^. employees ^. ix 0 ^. age)
-  putStrLn $ "Возраст второго сотрудника: " ++ show (updatedDepartment ^. employees ^. ix 1 ^. age)
-  putStrLn $ "Комната: " ++ show (updatedDepartment ^. location ^. room)
+  putStrLn $ "Возраст первого сотрудника: " ++ show (viewThrough3 updatedDepartment employees (ix 0) age)
+  putStrLn $ "Возраст второго сотрудника: " ++ show (viewThrough3 updatedDepartment employees (ix 1) age)
+  putStrLn $ "Комната: " ++ show (viewThrough updatedDepartment location room)
 
 -- Пример 6: Другие полезные операции
 example6 :: IO ()
@@ -401,8 +397,8 @@ example6 = do
   
   let updatedPerson = samplePerson & (address %~ updateAddress)
   
-  putStrLn $ "Обновленная улица: " ++ (updatedPerson ^. address ^. street)
-  putStrLn $ "Обновленный индекс: " ++ (updatedPerson ^. address ^. zipCode)
+  putStrLn $ "Обновленная улица: " ++ viewThrough updatedPerson address street
+  putStrLn $ "Обновленный индекс: " ++ viewThrough updatedPerson address zipCode
   
   -- Использование both для работы с парами
   let pair = ("hello", "world")
@@ -424,7 +420,7 @@ example6 = do
 -- Главная функция
 main :: IO ()
 main = do
-  putStrLn "Стандартные линзы в библиотеке lens\n"
+  putStrLn "Линзы в Haskell\n"
   
   example1
   example2
@@ -433,9 +429,9 @@ main = do
   example5
   example6
   
-  putStrLn "\nКлючевые моменты о стандартных линзах:"
-  putStrLn "1. Библиотека lens предоставляет множество стандартных линз для работы с различными структурами данных"
-  putStrLn "2. Template Haskell (makeLenses) автоматически создает линзы для полей структур данных"
+  putStrLn "\nКлючевые моменты о линзах:"
+  putStrLn "1. Линзы - это комбинация геттера и сеттера для поля структуры данных"
+  putStrLn "2. Линзы позволяют работать с вложенными структурами данных"
   putStrLn "3. Операторы .~, %~, ^. делают код более читаемым и выразительным"
   putStrLn "4. Линзы можно комбинировать для работы с вложенными структурами"
-  putStrLn "5. Библиотека lens предоставляет специальные линзы для работы со списками, Map и другими структурами данных"
+  putStrLn "5. Линзы предоставляют специальные функции для работы со списками, Map и другими структурами данных"

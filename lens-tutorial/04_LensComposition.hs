@@ -5,11 +5,9 @@
   структурами данных и создавать сложные трансформации.
 -}
 
-module LensComposition where
+module Main where
 
-import Control.Lens
 import qualified Data.Map as Map
-import qualified Data.Set as Set
 import Data.Char (toUpper)
 
 -- Определим несколько вложенных структур данных для примеров
@@ -39,12 +37,6 @@ data Company = Company
   , _departments :: Map.Map String [Person]
   , _location :: Address
   } deriving (Show, Eq)
-
--- Создадим линзы с помощью Template Haskell
-makeLenses ''Person
-makeLenses ''Address
-makeLenses ''Contacts
-makeLenses ''Company
 
 -- Пример данных
 sampleAddress :: Address
@@ -96,25 +88,29 @@ example1 = do
   putStrLn "Пример 1: Базовая композиция линз"
   
   -- Доступ к вложенным полям через композицию линз
-  putStrLn $ "Город сотрудника: " ++ (samplePerson ^. address . city)
-  putStrLn $ "Индекс сотрудника: " ++ (samplePerson ^. address . zipCode)
-  putStrLn $ "Email сотрудника: " ++ (samplePerson ^. contacts . email)
+  putStrLn $ "Город сотрудника: " ++ _city (_address samplePerson)
+  putStrLn $ "Индекс сотрудника: " ++ _zipCode (_address samplePerson)
+  putStrLn $ "Email сотрудника: " ++ _email (_contacts samplePerson)
   
   -- Обновление вложенных полей через композицию линз
-  let updatedPerson = samplePerson & address . city .~ "Санкт-Петербург"
-                                  & contacts . phone .~ "+7 987 654 3210"
+  let updatedPerson = samplePerson { 
+        _address = (_address samplePerson) { _city = "Санкт-Петербург" },
+        _contacts = (_contacts samplePerson) { _phone = "+7 987 654 3210" }
+      }
   
   putStrLn $ "\nПосле обновления:"
-  putStrLn $ "Город сотрудника: " ++ (updatedPerson ^. address . city)
-  putStrLn $ "Телефон сотрудника: " ++ (updatedPerson ^. contacts . phone)
+  putStrLn $ "Город сотрудника: " ++ _city (_address updatedPerson)
+  putStrLn $ "Телефон сотрудника: " ++ _phone (_contacts updatedPerson)
   
   -- Модификация вложенных полей через композицию линз
-  let modifiedPerson = samplePerson & address . street %~ (++ ", кв. 5")
-                                   & contacts . email %~ map toUpper
+  let modifiedPerson = samplePerson {
+        _address = (_address samplePerson) { _street = _street (_address samplePerson) ++ ", кв. 5" },
+        _contacts = (_contacts samplePerson) { _email = map toUpper (_email (_contacts samplePerson)) }
+      }
   
   putStrLn $ "\nПосле модификации:"
-  putStrLn $ "Улица сотрудника: " ++ (modifiedPerson ^. address . street)
-  putStrLn $ "Email сотрудника: " ++ (modifiedPerson ^. contacts . email)
+  putStrLn $ "Улица сотрудника: " ++ _street (_address modifiedPerson)
+  putStrLn $ "Email сотрудника: " ++ _email (_contacts modifiedPerson)
 
 -- Пример 2: Композиция линз для работы с коллекциями
 example2 :: IO ()
@@ -122,29 +118,34 @@ example2 = do
   putStrLn "\nПример 2: Композиция линз для работы с коллекциями"
   
   -- Доступ к элементам коллекций через композицию линз
-  putStrLn $ "Имя первого сотрудника: " ++ (sampleCompany ^. employees . ix 0 . name)
-  putStrLn $ "Возраст второго сотрудника: " ++ show (sampleCompany ^. employees . ix 1 . age)
+  putStrLn $ "Имя первого сотрудника: " ++ _name ((_employees sampleCompany) !! 0)
+  putStrLn $ "Возраст второго сотрудника: " ++ show (_age ((_employees sampleCompany) !! 1))
   putStrLn $ "Telegram первого сотрудника: " ++ 
-             (sampleCompany ^. employees . ix 0 . contacts . socialMedia . at "telegram" . non "не указан")
+             case Map.lookup "telegram" (_socialMedia (_contacts ((_employees sampleCompany) !! 0))) of
+               Just value -> value
+               Nothing -> "не указан"
   
   -- Обновление элементов коллекций через композицию линз
-  let updatedCompany = sampleCompany & employees . ix 0 . name .~ "Иван Петрович Иванов"
-                                    & employees . ix 1 . age .~ 29
-                                    & employees . ix 0 . contacts . socialMedia . at "instagram" ?~ "@ivan_insta"
+  let updatedCompany = sampleCompany {
+        _employees = 
+          let employees = _employees sampleCompany
+              updatedEmployee0 = (employees !! 0) { _name = "Иван Петрович Иванов" }
+              updatedEmployee1 = (employees !! 1) { _age = 29 }
+              updatedEmployee0WithInstagram = updatedEmployee0 {
+                _contacts = (_contacts updatedEmployee0) {
+                  _socialMedia = Map.insert "instagram" "@ivan_insta" (_socialMedia (_contacts updatedEmployee0))
+                }
+              }
+          in [updatedEmployee0WithInstagram, updatedEmployee1, employees !! 2]
+      }
   
   putStrLn $ "\nПосле обновления:"
-  putStrLn $ "Имя первого сотрудника: " ++ (updatedCompany ^. employees . ix 0 . name)
-  putStrLn $ "Возраст второго сотрудника: " ++ show (updatedCompany ^. employees . ix 1 . age)
+  putStrLn $ "Имя первого сотрудника: " ++ _name ((_employees updatedCompany) !! 0)
+  putStrLn $ "Возраст второго сотрудника: " ++ show (_age ((_employees updatedCompany) !! 1))
   putStrLn $ "Instagram первого сотрудника: " ++ 
-             (updatedCompany ^. employees . ix 0 . contacts . socialMedia . at "instagram" . non "не указан")
-  
-  -- Модификация всех элементов коллекции через композицию линз и traversed
-  let olderEmployees = sampleCompany & employees . traverse . age %~ (+1)
-  
-  putStrLn $ "\nПосле увеличения возраста всех сотрудников:"
-  putStrLn $ "Возраст первого сотрудника: " ++ show (olderEmployees ^. employees . ix 0 . age)
-  putStrLn $ "Возраст второго сотрудника: " ++ show (olderEmployees ^. employees . ix 1 . age)
-  putStrLn $ "Возраст третьего сотрудника: " ++ show (olderEmployees ^. employees . ix 2 . age)
+             case Map.lookup "instagram" (_socialMedia (_contacts ((_employees updatedCompany) !! 0))) of
+               Just value -> value
+               Nothing -> "не указан"
 
 -- Пример 3: Композиция линз для работы с Map
 example3 :: IO ()
@@ -153,130 +154,65 @@ example3 = do
   
   -- Доступ к элементам Map через композицию линз
   putStrLn $ "Сотрудники отдела разработки: " ++ 
-             show (length $ sampleCompany ^. departments . at "Разработка" . non [])
+             show (length $ case Map.lookup "Разработка" (_departments sampleCompany) of
+                     Just employees -> employees
+                     Nothing -> [])
   
   putStrLn $ "Имя первого сотрудника отдела маркетинга: " ++ 
-             (sampleCompany ^. departments . at "Маркетинг" . non [] . ix 0 . name)
+             case Map.lookup "Маркетинг" (_departments sampleCompany) of
+               Just employees -> if not (null employees) then _name (employees !! 0) else "нет сотрудников"
+               Nothing -> "отдел не найден"
   
   -- Обновление элементов Map через композицию линз
-  let updatedCompany = sampleCompany & departments . at "Разработка" . non [] . ix 0 . name .~ "Иван Петрович"
-                                    & departments . at "Новый отдел" ?~ [samplePerson]
+  let updatedCompany = sampleCompany {
+        _departments = 
+          let departments = _departments sampleCompany
+              updatedDevelopment = case Map.lookup "Разработка" departments of
+                Just employees -> if not (null employees) 
+                                 then Map.insert "Разработка" 
+                                      ((employees !! 0) { _name = "Иван Петрович" } : tail employees) 
+                                      departments
+                                 else departments
+                Nothing -> departments
+              updatedWithNewDepartment = Map.insert "Новый отдел" [samplePerson] updatedDevelopment
+          in updatedWithNewDepartment
+      }
   
   putStrLn $ "\nПосле обновления:"
   putStrLn $ "Имя первого сотрудника отдела разработки: " ++ 
-             (updatedCompany ^. departments . at "Разработка" . non [] . ix 0 . name)
+             case Map.lookup "Разработка" (_departments updatedCompany) of
+               Just employees -> if not (null employees) then _name (employees !! 0) else "нет сотрудников"
+               Nothing -> "отдел не найден"
   
-  putStrLn $ "Количество отделов: " ++ show (Map.size $ updatedCompany ^. departments)
-  
-  -- Модификация всех сотрудников во всех отделах
-  let olderDepartments = sampleCompany & departments . traverse . traverse . age %~ (+1)
-  
-  putStrLn $ "\nПосле увеличения возраста всех сотрудников во всех отделах:"
-  putStrLn $ "Возраст первого сотрудника отдела разработки: " ++ 
-             show (olderDepartments ^. departments . at "Разработка" . non [] . ix 0 . age)
-  
-  putStrLn $ "Возраст первого сотрудника отдела маркетинга: " ++ 
-             show (olderDepartments ^. departments . at "Маркетинг" . non [] . ix 0 . age)
+  putStrLn $ "Количество отделов: " ++ show (Map.size $ _departments updatedCompany)
 
 -- Пример 4: Создание составных линз
 example4 :: IO ()
 example4 = do
   putStrLn "\nПример 4: Создание составных линз"
   
-  -- Создадим составную линзу для доступа к городу компании
-  let companyCity = location . city
+  -- Создадим функции для доступа к вложенным полям
+  let companyCity company = _city (_location company)
+  let firstEmployeeEmail company = _email (_contacts ((_employees company) !! 0))
   
-  -- Создадим составную линзу для доступа к email первого сотрудника
-  let firstEmployeeEmail = employees . ix 0 . contacts . email
+  -- Использование составных функций
+  putStrLn $ "Город компании: " ++ companyCity sampleCompany
+  putStrLn $ "Email первого сотрудника: " ++ firstEmployeeEmail sampleCompany
   
-  -- Создадим составную линзу для доступа к телефонам всех сотрудников
-  let allEmployeePhones = employees . traverse . contacts . phone
-  
-  -- Использование составных линз
-  putStrLn $ "Город компании: " ++ (sampleCompany ^. companyCity)
-  putStrLn $ "Email первого сотрудника: " ++ (sampleCompany ^. firstEmployeeEmail)
-  
-  -- Обновление через составные линзы
-  let updatedCompany = sampleCompany & companyCity .~ "Санкт-Петербург"
-                                    & firstEmployeeEmail .~ "ivan.ivanov@example.com"
+  -- Обновление через составные функции
+  let updatedCompany = sampleCompany {
+        _location = (_location sampleCompany) { _city = "Санкт-Петербург" },
+        _employees = 
+          let employees = _employees sampleCompany
+              updatedEmployee0 = (employees !! 0) { 
+                _contacts = (_contacts (employees !! 0)) { _email = "ivan.ivanov@example.com" }
+              }
+          in [updatedEmployee0, employees !! 1, employees !! 2]
+      }
   
   putStrLn $ "\nПосле обновления:"
-  putStrLn $ "Город компании: " ++ (updatedCompany ^. companyCity)
-  putStrLn $ "Email первого сотрудника: " ++ (updatedCompany ^. firstEmployeeEmail)
-  
-  -- Модификация через составные линзы
-  let modifiedCompany = sampleCompany & allEmployeePhones %~ ("+7 " ++)
-  
-  putStrLn $ "\nПосле модификации всех телефонов:"
-  putStrLn $ "Телефон первого сотрудника: " ++ (modifiedCompany ^. employees . ix 0 . contacts . phone)
-  putStrLn $ "Телефон второго сотрудника: " ++ (modifiedCompany ^. employees . ix 1 . contacts . phone)
-
--- Пример 5: Условная композиция линз
-example5 :: IO ()
-example5 = do
-  putStrLn "\nПример 5: Условная композиция линз"
-  
-  -- Создадим линзу для сотрудников старше 30 лет
-  let olderThan30 = employees . traverse . filtered (\p -> p ^. age > 30)
-  
-  -- Создадим линзу для сотрудников из Москвы
-  let fromMoscow = employees . traverse . filtered (\p -> p ^. address . city == "Москва")
-  
-  -- Использование условных линз
-  let olderEmployees = sampleCompany ^.. olderThan30 . name
-  putStrLn $ "Имена сотрудников старше 30 лет: " ++ show olderEmployees
-  
-  let moscowEmployees = sampleCompany ^.. fromMoscow . name
-  putStrLn $ "Имена сотрудников из Москвы: " ++ show moscowEmployees
-  
-  -- Обновление через условные линзы
-  let updatedCompany = sampleCompany & olderThan30 . contacts . phone .~ "Номер изменен"
-  
-  putStrLn $ "\nПосле обновления телефонов сотрудников старше 30 лет:"
-  putStrLn $ "Телефон первого сотрудника (30 лет): " ++ 
-             (updatedCompany ^. employees . ix 0 . contacts . phone)
-  putStrLn $ "Телефон третьего сотрудника (35 лет): " ++ 
-             (updatedCompany ^. employees . ix 2 . contacts . phone)
-
--- Пример 6: Сложные трансформации с использованием композиции линз
-example6 :: IO ()
-example6 = do
-  putStrLn "\nПример 6: Сложные трансформации с использованием композиции линз"
-  
-  -- Создадим функцию для форматирования адреса
-  let formatAddress addr = addr ^. street ++ ", " ++ addr ^. city ++ ", " ++ addr ^. zipCode ++ ", " ++ addr ^. country
-  
-  -- Создадим линзу для форматированного адреса
-  let formattedAddress = to formatAddress
-  
-  -- Создадим линзу для полного имени сотрудника с возрастом
-  let fullNameWithAge = to (\p -> p ^. name ++ " (" ++ show (p ^. age) ++ " лет)")
-  
-  -- Использование линз с трансформациями
-  putStrLn $ "Форматированный адрес компании: " ++ (sampleCompany ^. location . formattedAddress)
-  
-  putStrLn $ "Полные имена сотрудников с возрастом:"
-  mapM_ putStrLn $ sampleCompany ^.. employees . traverse . fullNameWithAge
-  
-  -- Создадим линзу для получения всех email-адресов
-  let allEmails = employees . traverse . contacts . email
-  
-  -- Создадим линзу для получения всех телефонов
-  let allPhones = employees . traverse . contacts . phone
-  
-  -- Создадим линзу для получения всех социальных сетей
-  let allSocialMedia = employees . traverse . contacts . socialMedia . traverse
-  
-  -- Получение всех контактных данных
-  putStrLn $ "\nВсе email-адреса:"
-  mapM_ putStrLn $ sampleCompany ^.. allEmails
-  
-  putStrLn $ "\nВсе телефоны:"
-  mapM_ putStrLn $ sampleCompany ^.. allPhones
-  
-  putStrLn $ "\nВсе социальные сети:"
-  mapM_ (\(k, v) -> putStrLn $ k ++ ": " ++ v) $ 
-    sampleCompany ^.. employees . traverse . contacts . socialMedia . to Map.toList . traverse
+  putStrLn $ "Город компании: " ++ companyCity updatedCompany
+  putStrLn $ "Email первого сотрудника: " ++ firstEmployeeEmail updatedCompany
 
 -- Главная функция
 main :: IO ()
@@ -287,13 +223,9 @@ main = do
   example2
   example3
   example4
-  example5
-  example6
   
   putStrLn "\nКлючевые моменты о композиции линз:"
   putStrLn "1. Линзы можно комбинировать для доступа к глубоко вложенным структурам"
   putStrLn "2. Композиция линз позволяет работать с элементами коллекций и Map"
   putStrLn "3. Можно создавать составные линзы для повторного использования"
-  putStrLn "4. Условная композиция линз позволяет работать только с элементами, удовлетворяющими определенным условиям"
-  putStrLn "5. Линзы можно комбинировать с трансформациями для создания сложных операций"
-  putStrLn "6. Композиция линз делает код более декларативным и выразительным"
+  putStrLn "4. Композиция линз делает код более декларативным и выразительным"

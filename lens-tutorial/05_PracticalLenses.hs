@@ -5,440 +5,233 @@
   для решения реальных задач.
 -}
 
-module PracticalLenses where
+module Main where
 
-import Control.Lens
 import qualified Data.Map as Map
-import qualified Data.Set as Set
-import qualified Data.Text as Text
 import Data.Char (toUpper, toLower)
-import Data.List (intercalate, sortBy)
-import Data.Ord (comparing)
-import Data.Maybe (fromMaybe)
 
--- Пример 1: Работа с конфигурационными файлами
+-- Определим структуры данных для примеров
+data User = User
+  { _userId :: Int
+  , _userName :: String
+  , _userEmail :: String
+  , _userSettings :: UserSettings
+  , _userStats :: UserStats
+  } deriving (Show, Eq)
+
+data UserSettings = UserSettings
+  { _theme :: String
+  , _notifications :: Bool
+  , _language :: String
+  , _privacy :: PrivacySettings
+  } deriving (Show, Eq)
+
+data PrivacySettings = PrivacySettings
+  { _showEmail :: Bool
+  , _showActivity :: Bool
+  , _allowMessages :: Bool
+  } deriving (Show, Eq)
+
+data UserStats = UserStats
+  { _postsCount :: Int
+  , _commentsCount :: Int
+  , _likesCount :: Int
+  , _lastActive :: String
+  } deriving (Show, Eq)
+
+-- Пример данных
+sampleUser :: User
+sampleUser = User
+  { _userId = 12345
+  , _userName = "ivan_ivanov"
+  , _userEmail = "ivan@example.com"
+  , _userSettings = UserSettings
+      { _theme = "light"
+      , _notifications = True
+      , _language = "ru"
+      , _privacy = PrivacySettings
+          { _showEmail = False
+          , _showActivity = True
+          , _allowMessages = True
+          }
+      }
+  , _userStats = UserStats
+      { _postsCount = 42
+      , _commentsCount = 156
+      , _likesCount = 789
+      , _lastActive = "2023-05-15"
+      }
+  }
+
+-- Пример 1: Обновление настроек пользователя
 example1 :: IO ()
 example1 = do
-  putStrLn "Пример 1: Работа с конфигурационными файлами"
+  putStrLn "Пример 1: Обновление настроек пользователя"
   
-  -- Определим структуру для конфигурации приложения
-  let config = AppConfig
-        { _appName = "MyApp"
-        , _version = "1.0.0"
-        , _settings = Map.fromList
-            [ ("theme", "dark")
-            , ("language", "ru")
-            , ("fontSize", "14")
-            ]
-        , _paths = Paths
-            { _dataPath = "/var/data"
-            , _logPath = "/var/log"
-            , _configPath = "/etc/myapp"
-            }
-        , _features = Features
-            { _enableLogging = True
-            , _enableCache = True
-            , _debugMode = False
-            }
+  putStrLn "Исходные настройки пользователя:"
+  putStrLn $ "Тема: " ++ _theme (_userSettings sampleUser)
+  putStrLn $ "Уведомления: " ++ show (_notifications (_userSettings sampleUser))
+  putStrLn $ "Язык: " ++ _language (_userSettings sampleUser)
+  
+  -- Обновление настроек пользователя
+  let updatedUser = sampleUser {
+        _userSettings = (_userSettings sampleUser) {
+          _theme = "dark",
+          _notifications = False,
+          _language = "en"
         }
+      }
   
-  -- Создадим линзы для работы с конфигурацией
-  let appNameL = lens _appName (\c n -> c { _appName = n })
-  let versionL = lens _version (\c v -> c { _version = v })
-  let settingsL = lens _settings (\c s -> c { _settings = s })
-  let pathsL = lens _paths (\c p -> c { _paths = p })
-  let featuresL = lens _features (\c f -> c { _features = f })
+  putStrLn "\nОбновленные настройки пользователя:"
+  putStrLn $ "Тема: " ++ _theme (_userSettings updatedUser)
+  putStrLn $ "Уведомления: " ++ show (_notifications (_userSettings updatedUser))
+  putStrLn $ "Язык: " ++ _language (_userSettings updatedUser)
   
-  -- Создадим линзы для вложенных структур
-  let dataPathL = lens _dataPath (\p d -> p { _dataPath = d })
-  let logPathL = lens _logPath (\p l -> p { _logPath = l })
-  let configPathL = lens _configPath (\p c -> p { _configPath = c })
+  -- Обновление настроек приватности
+  let privateUser = sampleUser {
+        _userSettings = (_userSettings sampleUser) {
+          _privacy = PrivacySettings {
+            _showEmail = False,
+            _showActivity = False,
+            _allowMessages = False
+          }
+        }
+      }
   
-  let enableLoggingL = lens _enableLogging (\f l -> f { _enableLogging = l })
-  let enableCacheL = lens _enableCache (\f c -> f { _enableCache = c })
-  let debugModeL = lens _debugMode (\f d -> f { _debugMode = d })
-  
-  -- Составные линзы для доступа к вложенным полям
-  let appDataPathL = pathsL . dataPathL
-  let appLogPathL = pathsL . logPathL
-  let appDebugModeL = featuresL . debugModeL
-  
-  -- Получение значений из конфигурации
-  putStrLn $ "Название приложения: " ++ (config ^. appNameL)
-  putStrLn $ "Версия: " ++ (config ^. versionL)
-  putStrLn $ "Тема: " ++ fromMaybe "не указана" (config ^. settingsL . at "theme")
-  putStrLn $ "Путь к данным: " ++ (config ^. appDataPathL)
-  putStrLn $ "Режим отладки: " ++ show (config ^. appDebugModeL)
-  
-  -- Обновление конфигурации
-  let updatedConfig = config & versionL .~ "1.1.0"
-                            & settingsL . at "theme" ?~ "light"
-                            & appLogPathL .~ "/var/log/myapp"
-                            & appDebugModeL .~ True
-  
-  putStrLn $ "\nПосле обновления:"
-  putStrLn $ "Версия: " ++ (updatedConfig ^. versionL)
-  putStrLn $ "Тема: " ++ fromMaybe "не указана" (updatedConfig ^. settingsL . at "theme")
-  putStrLn $ "Путь к логам: " ++ (updatedConfig ^. appLogPathL)
-  putStrLn $ "Режим отладки: " ++ show (updatedConfig ^. appDebugModeL)
-  
-  -- Создание конфигурации для разработки
-  let devConfig = config & appNameL %~ (++ "-dev")
-                        & settingsL . at "environment" ?~ "development"
-                        & appDebugModeL .~ True
-                        & pathsL . traverse %~ (++ "-dev")  -- Изменяем все пути
-  
-  putStrLn $ "\nКонфигурация для разработки:"
-  putStrLn $ "Название приложения: " ++ (devConfig ^. appNameL)
-  putStrLn $ "Окружение: " ++ fromMaybe "не указано" (devConfig ^. settingsL . at "environment")
-  putStrLn $ "Путь к данным: " ++ (devConfig ^. appDataPathL)
-  putStrLn $ "Путь к логам: " ++ (devConfig ^. appLogPathL)
-  putStrLn $ "Режим отладки: " ++ show (devConfig ^. appDebugModeL)
+  putStrLn "\nОбновленные настройки приватности:"
+  putStrLn $ "Показывать email: " ++ show (_showEmail (_privacy (_userSettings privateUser)))
+  putStrLn $ "Показывать активность: " ++ show (_showActivity (_privacy (_userSettings privateUser)))
+  putStrLn $ "Разрешить сообщения: " ++ show (_allowMessages (_privacy (_userSettings privateUser)))
 
--- Структуры данных для примера 1
-data AppConfig = AppConfig
-  { _appName :: String
-  , _version :: String
-  , _settings :: Map.Map String String
-  , _paths :: Paths
-  , _features :: Features
-  } deriving (Show, Eq)
-
-data Paths = Paths
-  { _dataPath :: String
-  , _logPath :: String
-  , _configPath :: String
-  } deriving (Show, Eq)
-
-data Features = Features
-  { _enableLogging :: Bool
-  , _enableCache :: Bool
-  , _debugMode :: Bool
-  } deriving (Show, Eq)
-
--- Пример 2: Работа с данными пользователей
+-- Пример 2: Работа с пользовательскими данными
 example2 :: IO ()
 example2 = do
-  putStrLn "\nПример 2: Работа с данными пользователей"
+  putStrLn "\nПример 2: Работа с пользовательскими данными"
   
-  -- Определим структуру для пользователей
-  let users = 
-        [ User "user1" "Иван Иванов" "ivan@example.com" 30 
-            (Address "ул. Ленина, 10" "Москва" "123456") 
-            [Role "admin" True, Role "user" True]
-        , User "user2" "Мария Петрова" "maria@example.com" 28 
-            (Address "ул. Пушкина, 15" "Санкт-Петербург" "654321") 
-            [Role "user" True]
-        , User "user3" "Алексей Сидоров" "alex@example.com" 35 
-            (Address "ул. Гагарина, 20" "Казань" "420001") 
-            [Role "editor" True, Role "user" True]
-        ]
+  -- Форматирование имени пользователя
+  let formattedUser = sampleUser {
+        _userName = map toUpper (_userName sampleUser),
+        _userEmail = map toLower (_userEmail sampleUser)
+      }
   
-  -- Создадим линзы для работы с пользователями
-  let usernameL = lens _username (\u n -> u { _username = n })
-  let fullNameL = lens _fullName (\u n -> u { _fullName = n })
-  let emailL = lens _email (\u e -> u { _email = e })
-  let ageL = lens _age (\u a -> u { _age = a })
-  let addressL = lens _address (\u a -> u { _address = a })
-  let rolesL = lens _roles (\u r -> u { _roles = r })
+  putStrLn $ "Исходное имя пользователя: " ++ _userName sampleUser
+  putStrLn $ "Отформатированное имя пользователя: " ++ _userName formattedUser
   
-  -- Создадим линзы для адреса
-  let streetL = lens _street (\a s -> a { _street = s })
-  let cityL = lens _city (\a c -> a { _city = c })
-  let zipCodeL = lens _zipCode (\a z -> a { _zipCode = z })
+  putStrLn $ "Исходный email пользователя: " ++ _userEmail sampleUser
+  putStrLn $ "Отформатированный email пользователя: " ++ _userEmail formattedUser
   
-  -- Создадим линзы для ролей
-  let roleNameL = lens _roleName (\r n -> r { _roleName = n })
-  let activeL = lens _active (\r a -> r { _active = a })
+  -- Обновление статистики пользователя
+  let activeUser = sampleUser {
+        _userStats = (_userStats sampleUser) {
+          _postsCount = _postsCount (_userStats sampleUser) + 1,
+          _commentsCount = _commentsCount (_userStats sampleUser) + 5,
+          _likesCount = _likesCount (_userStats sampleUser) + 10,
+          _lastActive = "2023-05-16"
+        }
+      }
   
-  -- Составные линзы
-  let userCityL = addressL . cityL
+  putStrLn "\nИсходная статистика пользователя:"
+  putStrLn $ "Количество постов: " ++ show (_postsCount (_userStats sampleUser))
+  putStrLn $ "Количество комментариев: " ++ show (_commentsCount (_userStats sampleUser))
+  putStrLn $ "Количество лайков: " ++ show (_likesCount (_userStats sampleUser))
+  putStrLn $ "Последняя активность: " ++ _lastActive (_userStats sampleUser)
   
-  -- Получение информации о пользователях
-  putStrLn "Список пользователей:"
-  mapM_ (\u -> putStrLn $ "- " ++ (u ^. fullNameL) ++ " (" ++ (u ^. emailL) ++ ")") users
-  
-  -- Фильтрация пользователей по городу
-  let moscowUsers = filter (\u -> u ^. userCityL == "Москва") users
-  putStrLn $ "\nПользователи из Москвы:"
-  mapM_ (\u -> putStrLn $ "- " ++ (u ^. fullNameL)) moscowUsers
-  
-  -- Фильтрация пользователей по роли
-  let admins = filter (hasRole "admin") users
-        where hasRole r u = any (\role -> role ^. roleNameL == r && role ^. activeL) (u ^. rolesL)
-  
-  putStrLn $ "\nАдминистраторы:"
-  mapM_ (\u -> putStrLn $ "- " ++ (u ^. fullNameL)) admins
-  
-  -- Обновление данных пользователей
-  let updatedUsers = over (traverse . filtered (\u -> u ^. ageL > 30)) 
-                          (emailL %~ map toUpper) users
-  
-  putStrLn $ "\nEmail пользователей старше 30 лет (в верхнем регистре):"
-  mapM_ (\u -> putStrLn $ "- " ++ (u ^. fullNameL) ++ ": " ++ (u ^. emailL)) updatedUsers
-  
-  -- Добавление новой роли всем пользователям
-  let usersWithNewRole = over traverse 
-                              (rolesL %~ (++ [Role "viewer" True])) 
-                              users
-  
-  putStrLn $ "\nРоли пользователя " ++ (head usersWithNewRole ^. fullNameL) ++ ":"
-  mapM_ (\r -> putStrLn $ "- " ++ (r ^. roleNameL) ++ 
-                          (if r ^. activeL then " (активна)" else " (неактивна)")) 
-        (head usersWithNewRole ^. rolesL)
+  putStrLn "\nОбновленная статистика пользователя:"
+  putStrLn $ "Количество постов: " ++ show (_postsCount (_userStats activeUser))
+  putStrLn $ "Количество комментариев: " ++ show (_commentsCount (_userStats activeUser))
+  putStrLn $ "Количество лайков: " ++ show (_likesCount (_userStats activeUser))
+  putStrLn $ "Последняя активность: " ++ _lastActive (_userStats activeUser)
 
--- Структуры данных для примера 2
-data User = User
-  { _username :: String
-  , _fullName :: String
-  , _email :: String
-  , _age :: Int
-  , _address :: Address
-  , _roles :: [Role]
-  } deriving (Show, Eq)
-
-data Address = Address
-  { _street :: String
-  , _city :: String
-  , _zipCode :: String
-  } deriving (Show, Eq)
-
-data Role = Role
-  { _roleName :: String
-  , _active :: Bool
-  } deriving (Show, Eq)
-
--- Пример 3: Работа с деревьями данных
+-- Пример 3: Создание составных функций для бизнес-логики
 example3 :: IO ()
 example3 = do
-  putStrLn "\nПример 3: Работа с деревьями данных"
+  putStrLn "\nПример 3: Создание составных функций для бизнес-логики"
   
-  -- Определим структуру для дерева файловой системы
-  let fileSystem = Directory "root" 
-        [ File "readme.txt" 1024 "text/plain"
-        , Directory "docs" 
-            [ File "manual.pdf" 2048 "application/pdf"
-            , File "guide.docx" 1536 "application/msword"
-            ]
-        , Directory "src" 
-            [ File "main.hs" 512 "text/x-haskell"
-            , File "utils.hs" 768 "text/x-haskell"
-            , Directory "lib" 
-                [ File "parser.hs" 1024 "text/x-haskell"
-                , File "renderer.hs" 896 "text/x-haskell"
-                ]
-            ]
-        ]
+  -- Создадим составную функцию для проверки, является ли пользователь активным
+  let isActiveUser user = _postsCount (_userStats user) > 0
   
-  -- Создадим линзы для работы с файловой системой
-  let nameL = lens getName (\fs n -> setName fs n)
-        where
-          getName (File n _ _) = n
-          getName (Directory n _) = n
-          setName (File _ s m) n = File n s m
-          setName (Directory _ c) n = Directory n c
+  -- Создадим составную функцию для получения полного имени пользователя
+  let fullUserName user = "User: " ++ _userName user
   
-  let sizeL = lens getSize (\fs s -> setSize fs s)
-        where
-          getSize (File _ s _) = s
-          getSize (Directory _ _) = 0  -- Директории сами по себе не имеют размера
-          setSize (File n _ m) s = File n s m
-          setSize d@(Directory _ _) _ = d  -- Нельзя установить размер директории
+  -- Создадим составную функцию для получения уровня приватности
+  let privacyLevel user = 
+        let privacy = _privacy (_userSettings user)
+            boolToInt b = if b then 0 else 1
+            level = boolToInt (_showEmail privacy) + 
+                    boolToInt (_showActivity privacy) + 
+                    boolToInt (_allowMessages privacy)
+        in if level == 0 then "Открытый"
+           else if level < 3 then "Умеренный"
+           else "Закрытый"
   
-  let mimeTypeL = lens getMimeType (\fs m -> setMimeType fs m)
-        where
-          getMimeType (File _ _ m) = m
-          getMimeType (Directory _ _) = "directory"
-          setMimeType (File n s _) m = File n s m
-          setMimeType d@(Directory _ _) _ = d  -- Нельзя установить MIME-тип директории
+  -- Использование составных функций
+  putStrLn $ "Активный пользователь: " ++ show (isActiveUser sampleUser)
+  putStrLn $ "Полное имя пользователя: " ++ fullUserName sampleUser
+  putStrLn $ "Уровень приватности: " ++ privacyLevel sampleUser
   
-  let contentsL = lens getContents (\fs c -> setContents fs c)
-        where
-          getContents (File _ _ _) = []
-          getContents (Directory _ c) = c
-          setContents (File n s m) _ = File n s m  -- Нельзя установить содержимое файла
-          setContents (Directory n _) c = Directory n c
+  -- Создадим неактивного пользователя
+  let inactiveUser = sampleUser {
+        _userStats = (_userStats sampleUser) {
+          _postsCount = 0,
+          _commentsCount = 0,
+          _likesCount = 0
+        }
+      }
   
-  -- Вспомогательные функции для работы с деревом
-  let isFile (File _ _ _) = True
-      isFile _ = False
+  putStrLn $ "\nНеактивный пользователь: " ++ show (isActiveUser inactiveUser)
   
-  let isDirectory (Directory _ _) = True
-      isDirectory _ = False
+  -- Создадим закрытого пользователя
+  let closedUser = sampleUser {
+        _userSettings = (_userSettings sampleUser) {
+          _privacy = PrivacySettings {
+            _showEmail = False,
+            _showActivity = False,
+            _allowMessages = False
+          }
+        }
+      }
   
-  let isHaskellFile fs = isFile fs && (fs ^. mimeTypeL == "text/x-haskell")
-  
-  -- Получение информации о файловой системе
-  putStrLn $ "Корневая директория: " ++ (fileSystem ^. nameL)
-  putStrLn $ "Количество элементов в корне: " ++ show (length $ fileSystem ^. contentsL)
-  
-  -- Поиск всех Haskell-файлов
-  let allFiles = fileSystem ^.. cosmos . filtered isFile
-  let haskellFiles = filter isHaskellFile allFiles
-  
-  putStrLn $ "\nВсе Haskell-файлы:"
-  mapM_ (\f -> putStrLn $ "- " ++ (f ^. nameL) ++ " (" ++ show (f ^. sizeL) ++ " байт)") haskellFiles
-  
-  -- Вычисление общего размера всех файлов
-  let totalSize = sum $ map (^. sizeL) allFiles
-  putStrLn $ "\nОбщий размер всех файлов: " ++ show totalSize ++ " байт"
-  
-  -- Обновление MIME-типа всех Haskell-файлов
-  let updatedFileSystem = over (cosmos . filtered isHaskellFile) 
-                               (mimeTypeL .~ "text/x-haskell-new") 
-                               fileSystem
-  
-  let updatedHaskellFiles = updatedFileSystem ^.. cosmos . filtered isFile . 
-                                                filtered (\f -> f ^. mimeTypeL == "text/x-haskell-new")
-  
-  putStrLn $ "\nОбновленные Haskell-файлы:"
-  mapM_ (\f -> putStrLn $ "- " ++ (f ^. nameL) ++ " (" ++ (f ^. mimeTypeL) ++ ")") updatedHaskellFiles
-  
-  -- Добавление нового файла в директорию src
-  let addFileToSrc = over (cosmos . filtered (\d -> isDirectory d && d ^. nameL == "src") . contentsL) 
-                          (++ [File "app.hs" 1280 "text/x-haskell"]) 
-  
-  let fileSystemWithNewFile = addFileToSrc fileSystem
-  let srcFiles = fileSystemWithNewFile ^.. cosmos . filtered (\d -> isDirectory d && d ^. nameL == "src") . 
-                                         contentsL . traverse . filtered isFile
-  
-  putStrLn $ "\nФайлы в директории src после добавления нового файла:"
-  mapM_ (\f -> putStrLn $ "- " ++ (f ^. nameL)) srcFiles
+  putStrLn $ "Уровень приватности закрытого пользователя: " ++ privacyLevel closedUser
 
--- Структуры данных для примера 3
-data FileSystem = File String Int String  -- имя, размер, MIME-тип
-                | Directory String [FileSystem]  -- имя, содержимое
-                deriving (Show, Eq)
-
--- Пример 4: Работа с JSON-подобными данными
+-- Пример 4: Использование функций для валидации данных
 example4 :: IO ()
 example4 = do
-  putStrLn "\nПример 4: Работа с JSON-подобными данными"
+  putStrLn "\nПример 4: Использование функций для валидации данных"
   
-  -- Определим структуру для JSON-подобных данных
-  let jsonData = Object $ Map.fromList
-        [ ("name", String "John Doe")
-        , ("age", Number 30)
-        , ("isActive", Boolean True)
-        , ("address", Object $ Map.fromList
-            [ ("street", String "123 Main St")
-            , ("city", String "New York")
-            , ("zipCode", String "10001")
-            ]
-          )
-        , ("tags", Array
-            [ String "developer"
-            , String "haskell"
-            , String "functional"
-            ]
-          )
-        , ("projects", Array
-            [ Object $ Map.fromList
-                [ ("name", String "Project A")
-                , ("status", String "completed")
-                ]
-            , Object $ Map.fromList
-                [ ("name", String "Project B")
-                , ("status", String "in-progress")
-                ]
-            ]
-          )
-        ]
+  -- Создадим функцию для валидации email
+  let validateEmail email = 
+        if '@' `elem` email && length email > 5
+        then Right email
+        else Left "Некорректный email"
   
-  -- Создадим линзы для работы с JSON-подобными данными
-  let _String (String s) = Just s
-      _String _ = Nothing
+  -- Создадим функцию для валидации имени пользователя
+  let validateUserName name =
+        if all (\c -> c `elem` (['a'..'z'] ++ ['0'..'9'] ++ "_")) name && length name >= 3
+        then Right name
+        else Left "Некорректное имя пользователя"
   
-  let _Number (Number n) = Just n
-      _Number _ = Nothing
+  -- Валидация данных пользователя
+  let validateUser user = do
+        validEmail <- validateEmail (_userEmail user)
+        validName <- validateUserName (_userName user)
+        return $ user {
+          _userEmail = validEmail,
+          _userName = validName
+        }
   
-  let _Boolean (Boolean b) = Just b
-      _Boolean _ = Nothing
+  -- Проверка валидного пользователя
+  putStrLn "Валидация данных пользователя:"
+  case validateUser sampleUser of
+    Right validUser -> putStrLn "Пользователь валиден"
+    Left error -> putStrLn $ "Ошибка валидации: " ++ error
   
-  let _Array (Array a) = Just a
-      _Array _ = Nothing
+  -- Проверка невалидного пользователя
+  let invalidUser = sampleUser { _userEmail = "invalid" }
   
-  let _Object (Object o) = Just o
-      _Object _ = Nothing
-  
-  -- Создадим призмы для работы с JSON-подобными данными
-  let _StringP = prism String _String
-  let _NumberP = prism Number _Number
-  let _BooleanP = prism Boolean _Boolean
-  let _ArrayP = prism Array _Array
-  let _ObjectP = prism Object _Object
-  
-  -- Создадим линзы для доступа к полям объекта
-  let key k = lens (\obj -> Map.findWithDefault Null k (getObject obj)) 
-                   (\obj v -> setObject obj k v)
-        where
-          getObject (Object o) = o
-          getObject _ = Map.empty
-          setObject (Object o) k v = Object (Map.insert k v o)
-          setObject other _ _ = other
-  
-  -- Создадим линзы для доступа к элементам массива
-  let ix' i = lens (\arr -> getArrayItem i arr) 
-                   (\arr v -> setArrayItem i v arr)
-        where
-          getArrayItem i (Array a) = if i >= 0 && i < length a then a !! i else Null
-          getArrayItem _ _ = Null
-          setArrayItem i v (Array a) = 
-            if i >= 0 && i < length a 
-            then Array (take i a ++ [v] ++ drop (i+1) a)
-            else Array a
-          setArrayItem _ _ other = other
-  
-  -- Получение данных из JSON
-  putStrLn "Данные из JSON:"
-  putStrLn $ "Имя: " ++ fromMaybe "" (jsonData ^? key "name" . _StringP)
-  putStrLn $ "Возраст: " ++ show (fromMaybe 0 (jsonData ^? key "age" . _NumberP))
-  putStrLn $ "Активен: " ++ show (fromMaybe False (jsonData ^? key "isActive" . _BooleanP))
-  putStrLn $ "Город: " ++ fromMaybe "" (jsonData ^? key "address" . key "city" . _StringP)
-  
-  -- Получение списка тегов
-  let tags = jsonData ^.. key "tags" . _ArrayP . traverse . _StringP
-  putStrLn $ "\nТеги: " ++ intercalate ", " tags
-  
-  -- Получение списка проектов
-  let projectNames = jsonData ^.. key "projects" . _ArrayP . traverse . key "name" . _StringP
-  putStrLn $ "\nПроекты: " ++ intercalate ", " projectNames
-  
-  -- Обновление данных в JSON
-  let updatedJsonData = jsonData & key "age" .~ Number 31
-                                & key "address" . key "city" .~ String "Boston"
-                                & key "tags" . _ArrayP %~ (++ [String "expert"])
-  
-  putStrLn $ "\nПосле обновления:"
-  putStrLn $ "Возраст: " ++ show (fromMaybe 0 (updatedJsonData ^? key "age" . _NumberP))
-  putStrLn $ "Город: " ++ fromMaybe "" (updatedJsonData ^? key "address" . key "city" . _StringP)
-  
-  let updatedTags = updatedJsonData ^.. key "tags" . _ArrayP . traverse . _StringP
-  putStrLn $ "Теги: " ++ intercalate ", " updatedTags
-  
-  -- Добавление нового проекта
-  let newProject = Object $ Map.fromList
-        [ ("name", String "Project C")
-        , ("status", String "planning")
-        ]
-  
-  let jsonDataWithNewProject = updatedJsonData & key "projects" . _ArrayP %~ (++ [newProject])
-  
-  let allProjects = jsonDataWithNewProject ^.. key "projects" . _ArrayP . traverse
-  putStrLn $ "\nВсе проекты после добавления нового:"
-  mapM_ (\p -> putStrLn $ "- " ++ 
-                fromMaybe "" (p ^? key "name" . _StringP) ++ 
-                " (" ++ fromMaybe "" (p ^? key "status" . _StringP) ++ ")") 
-        allProjects
-
--- Структуры данных для примера 4
-data JsonValue = Null
-               | String String
-               | Number Int
-               | Boolean Bool
-               | Array [JsonValue]
-               | Object (Map.Map String JsonValue)
-               deriving (Show, Eq)
+  putStrLn "\nВалидация данных невалидного пользователя:"
+  case validateUser invalidUser of
+    Right validUser -> putStrLn "Пользователь валиден"
+    Left error -> putStrLn $ "Ошибка валидации: " ++ error
 
 -- Главная функция
 main :: IO ()
@@ -451,9 +244,8 @@ main = do
   example4
   
   putStrLn "\nКлючевые моменты о практическом применении линз:"
-  putStrLn "1. Линзы упрощают работу с конфигурационными файлами и вложенными структурами данных"
-  putStrLn "2. Линзы позволяют легко фильтровать, обновлять и трансформировать данные"
-  putStrLn "3. Линзы особенно полезны при работе с деревьями данных и рекурсивными структурами"
-  putStrLn "4. Линзы делают код более декларативным и выразительным"
-  putStrLn "5. Линзы позволяют работать с данными в функциональном стиле, сохраняя неизменяемость"
-  putStrLn "6. Линзы можно комбинировать для создания сложных трансформаций данных"
+  putStrLn "1. Линзы упрощают работу с вложенными структурами данных"
+  putStrLn "2. Линзы позволяют создавать выразительный API для работы с данными"
+  putStrLn "3. Составные линзы могут инкапсулировать бизнес-логику"
+  putStrLn "4. Линзы делают код более декларативным и понятным"
+  putStrLn "5. Линзы можно использовать для валидации и трансформации данных"

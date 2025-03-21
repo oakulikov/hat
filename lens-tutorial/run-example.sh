@@ -26,7 +26,7 @@ case $example_num in
     file="02_CommonLenses.hs"
     ;;
   3)
-    file="03_CustomLenses.hs"
+    file="03_SimpleLenses.hs"
     ;;
   4)
     file="04_LensComposition.hs"
@@ -62,8 +62,8 @@ if [ "$example_num" -eq 1 ]; then
     echo "Trying with GHCi..."
     echo "main" | ghci -v0 "$file"
   fi
-elif [ "$example_num" -eq 2 ]; then
-  # Second example requires only containers package
+elif [ "$example_num" -eq 2 ] || [ "$example_num" -eq 3 ]; then
+  # Second and third examples require only containers package
   echo "Running with containers package..."
   runhaskell -package containers "$file"
   if [ $? -ne 0 ]; then
@@ -75,13 +75,13 @@ elif [ "$example_num" -eq 2 ]; then
   fi
 else
   # For other examples, include all necessary packages
-  echo "Running with package flags (required for examples 3-6)..."
-  runhaskell -package lens -package containers -package text -package vector "$file"
+  echo "Running with package flags (required for examples 4-6)..."
+  runhaskell -package containers "$file"
   if [ $? -ne 0 ]; then
     echo "Execution failed."
     
     # Alternative: try with GHCi
     echo "Trying with GHCi..."
-    echo "main" | ghci -v0 -package lens -package containers -package text -package vector "$file"
+    echo "main" | ghci -v0 -package containers "$file"
   fi
 fi

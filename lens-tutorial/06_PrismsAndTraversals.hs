@@ -1,444 +1,298 @@
 {-
   Призмы и траверсалы в Haskell
   
-  В этом файле мы рассмотрим другие оптики, связанные с линзами:
-  призмы (Prism) и траверсалы (Traversal).
+  В этом файле мы рассмотрим призмы и траверсалы - обобщения линз,
+  которые позволяют работать с суммами типов и коллекциями.
 -}
 
-module PrismsAndTraversals where
+module Main where
 
-import Control.Lens
 import qualified Data.Map as Map
-import qualified Data.Set as Set
-import Data.Char (toUpper, toLower, isDigit)
-import Data.List (intercalate, sortBy)
-import Data.Ord (comparing)
-import Data.Maybe (fromMaybe, isJust, fromJust)
+import Data.Char (toUpper)
 
--- Часть 1: Призмы (Prism)
--- Призмы - это оптики, которые фокусируются на одном конструкторе
--- алгебраического типа данных. Они позволяют "заглянуть" внутрь
--- значения и извлечь данные, если они соответствуют определенному
--- конструктору, или построить значение из данных.
+-- Определим типы данных для примеров
+data Shape
+  = Circle Double
+  | Rectangle Double Double
+  | Triangle Double Double Double
+  deriving (Show, Eq)
 
--- Пример 1: Основы призм
-example1 :: IO ()
-example1 = do
-  putStrLn "Пример 1: Основы призм"
-  
-  -- Определим алгебраический тип данных
-  let success = Success "Operation completed" 200
-  let failure = Failure "Not found" 404
-  let pending = Pending "Processing"
-  
-  -- Создадим призмы для каждого конструктора
-  let _Success = prism 
-        (\(msg, code) -> Success msg code)  -- Конструктор
-        (\r -> case r of                    -- Деконструктор
-                Success msg code -> Right (msg, code)
-                other -> Left other)
-  
-  let _Failure = prism 
-        (\(msg, code) -> Failure msg code)
-        (\r -> case r of
-                Failure msg code -> Right (msg, code)
-                other -> Left other)
-  
-  let _Pending = prism 
-        Pending
-        (\r -> case r of
-                Pending msg -> Right msg
-                other -> Left other)
-  
-  -- Использование призм для проверки типа
-  putStrLn $ "success это Success? " ++ show (is _Success success)
-  putStrLn $ "failure это Success? " ++ show (is _Success failure)
-  putStrLn $ "pending это Pending? " ++ show (is _Pending pending)
-  
-  -- Использование призм для извлечения данных
-  putStrLn $ "\nИзвлечение данных из success:"
-  case preview _Success success of
-    Just (msg, code) -> putStrLn $ "  Сообщение: " ++ msg ++ ", Код: " ++ show code
-    Nothing -> putStrLn "  Не Success"
-  
-  putStrLn $ "\nИзвлечение данных из failure:"
-  case preview _Failure failure of
-    Just (msg, code) -> putStrLn $ "  Сообщение: " ++ msg ++ ", Код: " ++ show code
-    Nothing -> putStrLn "  Не Failure"
-  
-  -- Использование призм для обновления данных
-  let updatedSuccess = success & _Success . _1 .~ "Operation successfully completed"
-  let updatedFailure = failure & _Failure . _2 .~ 500
-  
-  putStrLn $ "\nПосле обновления:"
-  case preview _Success updatedSuccess of
-    Just (msg, code) -> putStrLn $ "  Success: " ++ msg ++ ", Код: " ++ show code
-    Nothing -> putStrLn "  Не Success"
-  
-  case preview _Failure updatedFailure of
-    Just (msg, code) -> putStrLn $ "  Failure: " ++ msg ++ ", Код: " ++ show code
-    Nothing -> putStrLn "  Не Failure"
-  
-  -- Создание новых значений через призмы
-  let newSuccess = review _Success ("Created via prism", 201)
-  let newPending = review _Pending "Waiting for approval"
-  
-  putStrLn $ "\nСозданные через призмы значения:"
-  putStrLn $ "  newSuccess: " ++ show newSuccess
-  putStrLn $ "  newPending: " ++ show newPending
-
--- Тип данных для примера 1
-data Result = Success String Int
-            | Failure String Int
-            | Pending String
-            deriving (Show, Eq)
-
--- Пример 2: Призмы для стандартных типов данных
-example2 :: IO ()
-example2 = do
-  putStrLn "\nПример 2: Призмы для стандартных типов данных"
-  
-  -- Призма для Maybe
-  let _Just = prism 
-        id  -- Конструктор: просто возвращаем значение
-        (\m -> case m of
-                Just a -> Right a
-                Nothing -> Left Nothing)
-  
-  let _Nothing = prism' 
-        (\() -> Nothing)  -- Конструктор: создаем Nothing из ()
-        (\m -> case m of
-                Nothing -> Just ()
-                _ -> Nothing)
-  
-  -- Призма для Either
-  let _Left = prism 
-        Left
-        (\e -> case e of
-                Left a -> Right a
-                Right b -> Left (Right b))
-  
-  let _Right = prism 
-        Right
-        (\e -> case e of
-                Right b -> Right b
-                Left a -> Left (Left a))
-  
-  -- Использование призм для Maybe
-  let justValue = Just 42
-  let nothingValue = Nothing :: Maybe Int
-  
-  putStrLn $ "justValue это Just? " ++ show (is _Just justValue)
-  putStrLn $ "nothingValue это Nothing? " ++ show (is _Nothing nothingValue)
-  
-  putStrLn $ "\nИзвлечение значения из justValue: " ++ 
-             show (fromMaybe 0 (preview _Just justValue))
-  
-  let updatedJust = justValue & _Just %~ (*2)
-  putStrLn $ "justValue после умножения на 2: " ++ show updatedJust
-  
-  -- Использование призм для Either
-  let leftValue = Left "error" :: Either String Int
-  let rightValue = Right 42 :: Either String Int
-  
-  putStrLn $ "\nleftValue это Left? " ++ show (is _Left leftValue)
-  putStrLn $ "rightValue это Right? " ++ show (is _Right rightValue)
-  
-  putStrLn $ "Извлечение значения из rightValue: " ++ 
-             show (fromMaybe 0 (preview _Right rightValue))
-  
-  let updatedRight = rightValue & _Right %~ (+10)
-  putStrLn $ "rightValue после добавления 10: " ++ show updatedRight
-  
-  let updatedLeft = leftValue & _Left %~ map toUpper
-  putStrLn $ "leftValue после преобразования в верхний регистр: " ++ show updatedLeft
-  
-  -- Создание новых значений через призмы
-  let newJust = review _Just 100
-  let newLeft = review _Left "new error"
-  
-  putStrLn $ "\nСозданные через призмы значения:"
-  putStrLn $ "  newJust: " ++ show newJust
-  putStrLn $ "  newLeft: " ++ show newLeft
-
--- Пример 3: Призмы для работы с типами-суммами
-example3 :: IO ()
-example3 = do
-  putStrLn "\nПример 3: Призмы для работы с типами-суммами"
-  
-  -- Определим тип данных для представления JSON-подобных значений
-  let jsonValues = 
-        [ JNull
-        , JBool True
-        , JNumber 42
-        , JString "hello"
-        , JArray [JNumber 1, JNumber 2, JNumber 3]
-        , JObject $ Map.fromList [("name", JString "John"), ("age", JNumber 30)]
-        ]
-  
-  -- Создадим призмы для каждого конструктора
-  let _JNull = prism' 
-        (\() -> JNull)
-        (\j -> case j of
-                JNull -> Just ()
-                _ -> Nothing)
-  
-  let _JBool = prism 
-        JBool
-        (\j -> case j of
-                JBool b -> Right b
-                other -> Left other)
-  
-  let _JNumber = prism 
-        JNumber
-        (\j -> case j of
-                JNumber n -> Right n
-                other -> Left other)
-  
-  let _JString = prism 
-        JString
-        (\j -> case j of
-                JString s -> Right s
-                other -> Left other)
-  
-  let _JArray = prism 
-        JArray
-        (\j -> case j of
-                JArray a -> Right a
-                other -> Left other)
-  
-  let _JObject = prism 
-        JObject
-        (\j -> case j of
-                JObject o -> Right o
-                other -> Left other)
-  
-  -- Использование призм для фильтрации значений по типу
-  let strings = filter (is _JString) jsonValues
-  let numbers = filter (is _JNumber) jsonValues
-  let arrays = filter (is _JArray) jsonValues
-  
-  putStrLn $ "Количество строк: " ++ show (length strings)
-  putStrLn $ "Количество чисел: " ++ show (length numbers)
-  putStrLn $ "Количество массивов: " ++ show (length arrays)
-  
-  -- Извлечение и обработка значений через призмы
-  let stringValues = mapMaybe (preview _JString) jsonValues
-  putStrLn $ "\nСтроковые значения: " ++ show stringValues
-  
-  let numberValues = mapMaybe (preview _JNumber) jsonValues
-  putStrLn $ "Числовые значения: " ++ show numberValues
-  
-  -- Обновление значений через призмы
-  let updatedValues = map (\j -> 
-                            if is _JString j 
-                            then j & _JString %~ map toUpper
-                            else if is _JNumber j
-                                 then j & _JNumber %~ (*2)
-                                 else j) 
-                          jsonValues
-  
-  putStrLn $ "\nОбновленные значения:"
-  mapM_ (\j -> putStrLn $ "  " ++ show j) updatedValues
-  
-  -- Создание новых значений через призмы
-  let newString = review _JString "new string"
-  let newArray = review _JArray [JBool False, JString "item"]
-  
-  putStrLn $ "\nСозданные через призмы значения:"
-  putStrLn $ "  newString: " ++ show newString
-  putStrLn $ "  newArray: " ++ show newArray
-
--- Тип данных для примера 3
-data JsonValue = JNull
-               | JBool Bool
-               | JNumber Int
-               | JString String
-               | JArray [JsonValue]
-               | JObject (Map.Map String JsonValue)
-               deriving (Show, Eq)
-
--- Часть 2: Траверсалы (Traversal)
--- Траверсалы - это оптики, которые фокусируются на нуле или более элементах
--- внутри структуры данных. Они позволяют обходить, извлекать и обновлять
--- несколько элементов одновременно.
-
--- Пример 4: Основы траверсалов
-example4 :: IO ()
-example4 = do
-  putStrLn "\nПример 4: Основы траверсалов"
-  
-  -- Определим некоторые структуры данных
-  let numbers = [1, 2, 3, 4, 5]
-  let nested = [[1, 2], [3, 4], [5, 6]]
-  
-  -- Траверсал для списка
-  let listTraversal = traverse
-  
-  -- Получение всех элементов через траверсал
-  putStrLn $ "Все элементы списка: " ++ show (numbers ^.. listTraversal)
-  
-  -- Обновление всех элементов через траверсал
-  let doubledNumbers = numbers & listTraversal %~ (*2)
-  putStrLn $ "Удвоенные числа: " ++ show doubledNumbers
-  
-  -- Фильтрация элементов через траверсал
-  let evenNumbers = numbers ^.. listTraversal . filtered even
-  putStrLn $ "Четные числа: " ++ show evenNumbers
-  
-  -- Траверсал для вложенных списков
-  let nestedTraversal = traverse . traverse
-  
-  -- Получение всех элементов через вложенный траверсал
-  putStrLn $ "\nВсе элементы вложенного списка: " ++ show (nested ^.. nestedTraversal)
-  
-  -- Обновление всех элементов через вложенный траверсал
-  let doubledNested = nested & nestedTraversal %~ (*2)
-  putStrLn $ "Удвоенные вложенные числа: " ++ show doubledNested
-  
-  -- Фильтрация элементов через вложенный траверсал
-  let evenNestedNumbers = nested ^.. nestedTraversal . filtered even
-  putStrLn $ "Четные числа во вложенном списке: " ++ show evenNestedNumbers
-  
-  -- Использование индексированного траверсала
-  putStrLn $ "\nЭлементы с индексами:"
-  let indexedList = numbers ^@.. traversed
-  mapM_ (\(i, v) -> putStrLn $ "  " ++ show i ++ ": " ++ show v) indexedList
-  
-  -- Обновление элементов с учетом их индексов
-  let numbersWithIndices = numbers & traversed %@~ (\i v -> v * i)
-  putStrLn $ "Числа, умноженные на их индексы: " ++ show numbersWithIndices
-
--- Пример 5: Траверсалы для сложных структур данных
-example5 :: IO ()
-example5 = do
-  putStrLn "\nПример 5: Траверсалы для сложных структур данных"
-  
-  -- Определим структуру данных для представления дерева
-  let tree = Node 1 
-              [ Node 2 
-                  [ Node 4 []
-                  , Node 5 []
-                  ]
-              , Node 3 
-                  [ Node 6 []
-                  , Node 7 
-                      [ Node 8 []
-                      , Node 9 []
-                      ]
-                  ]
-              ]
-  
-  -- Создадим траверсал для обхода всех узлов дерева
-  let allNodes = cosmos
-  
-  -- Получение всех значений узлов
-  let nodeValues = tree ^.. allNodes . nodeValueL
-        where nodeValueL = lens nodeValue (\n v -> n { nodeValue = v })
-  
-  putStrLn $ "Все значения узлов: " ++ show nodeValues
-  
-  -- Подсчет количества узлов
-  putStrLn $ "Количество узлов: " ++ show (length $ tree ^.. allNodes)
-  
-  -- Подсчет количества листьев (узлов без детей)
-  let leaves = tree ^.. allNodes . filtered (\n -> null (children n))
-  putStrLn $ "Количество листьев: " ++ show (length leaves)
-  
-  -- Обновление всех значений узлов
-  let doubledTree = tree & allNodes . nodeValueL %~ (*2)
-  
-  putStrLn $ "\nЗначения узлов после удвоения:"
-  let doubledNodeValues = doubledTree ^.. allNodes . nodeValueL
-  putStrLn $ "  " ++ show doubledNodeValues
-  
-  -- Фильтрация узлов по значению
-  let evenNodes = tree ^.. allNodes . filtered (\n -> even (nodeValue n))
-  putStrLn $ "\nУзлы с четными значениями:"
-  mapM_ (\n -> putStrLn $ "  " ++ show (nodeValue n)) evenNodes
-  
-  -- Обновление только четных значений
-  let updatedTree = tree & allNodes . filtered (\n -> even (nodeValue n)) . nodeValueL %~ (+10)
-  
-  putStrLn $ "\nЗначения узлов после обновления четных значений:"
-  let updatedNodeValues = updatedTree ^.. allNodes . nodeValueL
-  putStrLn $ "  " ++ show updatedNodeValues
-
--- Тип данных для примера 5
-data Tree a = Node 
-  { nodeValue :: a
-  , children :: [Tree a]
+data Person = Person
+  { _name :: String
+  , _age :: Int
+  , _address :: Address
   } deriving (Show, Eq)
 
-instance Plated (Tree a) where
-  plate f (Node v cs) = Node v <$> traverse f cs
+data Address = Address
+  { _street :: String
+  , _city :: String
+  , _zipCode :: String
+  } deriving (Show, Eq)
 
--- Пример 6: Комбинирование призм и траверсалов
-example6 :: IO ()
-example6 = do
-  putStrLn "\nПример 6: Комбинирование призм и траверсалов"
+data Company = Company
+  { _companyName :: String
+  , _employees :: [Person]
+  , _departments :: Map.Map String [Person]
+  } deriving (Show, Eq)
+
+-- Пример данных
+samplePerson :: Person
+samplePerson = Person
+  { _name = "Иван Иванов"
+  , _age = 30
+  , _address = Address
+      { _street = "ул. Ленина, 10"
+      , _city = "Москва"
+      , _zipCode = "123456"
+      }
+  }
+
+sampleCompany :: Company
+sampleCompany = Company
+  { _companyName = "ООО Рога и Копыта"
+  , _employees =
+      [ samplePerson
+      , Person "Мария Петрова" 28 (Address "ул. Гагарина, 5" "Москва" "123457")
+      , Person "Алексей Сидоров" 35 (Address "ул. Пушкина, 15" "Санкт-Петербург" "198765")
+      ]
+  , _departments = Map.fromList
+      [ ("Разработка", [samplePerson])
+      , ("Маркетинг", [Person "Мария Петрова" 28 (Address "ул. Гагарина, 5" "Москва" "123457")])
+      , ("Продажи", [Person "Алексей Сидоров" 35 (Address "ул. Пушкина, 15" "Санкт-Петербург" "198765")])
+      ]
+  }
+
+sampleShapes :: [Shape]
+sampleShapes =
+  [ Circle 5.0
+  , Rectangle 4.0 6.0
+  , Triangle 3.0 4.0 5.0
+  , Circle 2.5
+  , Rectangle 2.0 3.0
+  ]
+
+-- Пример 1: Работа с суммами типов (призмы)
+example1 :: IO ()
+example1 = do
+  putStrLn "Пример 1: Работа с суммами типов (призмы)"
   
-  -- Определим структуру данных
-  let values = 
-        [ Right 1
-        , Left "error 1"
-        , Right 2
-        , Left "error 2"
-        , Right 3
-        ] :: [Either String Int]
+  -- Функции для работы с Shape
+  let area :: Shape -> Double
+      area (Circle r) = pi * r * r
+      area (Rectangle w h) = w * h
+      area (Triangle a b c) = 
+        let s = (a + b + c) / 2
+        in sqrt (s * (s - a) * (s - b) * (s - c))
   
-  -- Создадим призму для Right
-  let _Right = prism 
-        Right
-        (\e -> case e of
-                Right b -> Right b
-                Left a -> Left (Left a))
+  let perimeter :: Shape -> Double
+      perimeter (Circle r) = 2 * pi * r
+      perimeter (Rectangle w h) = 2 * (w + h)
+      perimeter (Triangle a b c) = a + b + c
   
-  -- Создадим призму для Left
-  let _Left = prism 
-        Left
-        (\e -> case e of
-                Left a -> Right a
-                Right b -> Left (Right b))
+  -- Функции для работы с конкретными типами фигур
+  let isCircle :: Shape -> Bool
+      isCircle (Circle _) = True
+      isCircle _ = False
   
-  -- Комбинирование траверсала и призмы для работы только с Right значениями
-  let rightValues = values ^.. traverse . _Right
-  putStrLn $ "Значения Right: " ++ show rightValues
+  let isRectangle :: Shape -> Bool
+      isRectangle (Rectangle _ _) = True
+      isRectangle _ = False
   
-  -- Комбинирование траверсала и призмы для работы только с Left значениями
-  let leftValues = values ^.. traverse . _Left
-  putStrLn $ "Значения Left: " ++ show leftValues
+  let isTriangle :: Shape -> Bool
+      isTriangle (Triangle _ _ _) = True
+      isTriangle _ = False
   
-  -- Обновление только Right значений
-  let doubledRights = values & traverse . _Right %~ (*2)
-  putStrLn $ "\nПосле удвоения Right значений:"
-  mapM_ (putStrLn . ("  " ++) . show) doubledRights
+  let getCircleRadius :: Shape -> Maybe Double
+      getCircleRadius (Circle r) = Just r
+      getCircleRadius _ = Nothing
   
-  -- Обновление только Left значений
-  let uppercaseLefts = values & traverse . _Left %~ map toUpper
-  putStrLn $ "\nПосле преобразования Left значений в верхний регистр:"
-  mapM_ (putStrLn . ("  " ++) . show) uppercaseLefts
+  let getRectangleDimensions :: Shape -> Maybe (Double, Double)
+      getRectangleDimensions (Rectangle w h) = Just (w, h)
+      getRectangleDimensions _ = Nothing
   
-  -- Фильтрация и обновление
-  let evenRights = values & traverse . _Right . filtered even %~ (+10)
-  putStrLn $ "\nПосле добавления 10 к четным Right значениям:"
-  mapM_ (putStrLn . ("  " ++) . show) evenRights
+  let getTriangleSides :: Shape -> Maybe (Double, Double, Double)
+      getTriangleSides (Triangle a b c) = Just (a, b, c)
+      getTriangleSides _ = Nothing
   
-  -- Создание более сложной структуры данных
-  let nestedValues = 
-        [ [Right 1, Left "error 1"]
-        , [Right 2, Right 3]
-        , [Left "error 2", Left "error 3"]
-        ] :: [[Either String Int]]
+  -- Вывод информации о фигурах
+  putStrLn "Информация о фигурах:"
+  mapM_ (\shape -> do
+    putStrLn $ "Фигура: " ++ show shape
+    putStrLn $ "  Площадь: " ++ show (area shape)
+    putStrLn $ "  Периметр: " ++ show (perimeter shape)
+    
+    case getCircleRadius shape of
+      Just r -> putStrLn $ "  Тип: Круг, радиус: " ++ show r
+      Nothing -> return ()
+    
+    case getRectangleDimensions shape of
+      Just (w, h) -> putStrLn $ "  Тип: Прямоугольник, ширина: " ++ show w ++ ", высота: " ++ show h
+      Nothing -> return ()
+    
+    case getTriangleSides shape of
+      Just (a, b, c) -> putStrLn $ "  Тип: Треугольник, стороны: " ++ show a ++ ", " ++ show b ++ ", " ++ show c
+      Nothing -> return ()
+    
+    putStrLn "") sampleShapes
   
-  -- Комбинирование нескольких траверсалов и призмы
-  let allRightValues = nestedValues ^.. traverse . traverse . _Right
-  putStrLn $ "\nВсе Right значения во вложенной структуре: " ++ show allRightValues
+  -- Фильтрация фигур по типу
+  let circles = filter isCircle sampleShapes
+  let rectangles = filter isRectangle sampleShapes
+  let triangles = filter isTriangle sampleShapes
   
-  -- Обновление всех Right значений во вложенной структуре
-  let doubledNestedRights = nestedValues & traverse . traverse . _Right %~ (*2)
-  putStrLn $ "\nПосле удвоения всех Right значений во вложенной структуре:"
-  mapM_ (putStrLn . ("  " ++) . show) doubledNestedRights
+  putStrLn $ "Количество кругов: " ++ show (length circles)
+  putStrLn $ "Количество прямоугольников: " ++ show (length rectangles)
+  putStrLn $ "Количество треугольников: " ++ show (length triangles)
+  
+  -- Работа с конкретными типами фигур
+  putStrLn "\nРадиусы всех кругов:"
+  mapM_ (\shape -> case getCircleRadius shape of
+    Just r -> putStrLn $ "  Радиус: " ++ show r
+    Nothing -> return ()) sampleShapes
+  
+  putStrLn "\nРазмеры всех прямоугольников:"
+  mapM_ (\shape -> case getRectangleDimensions shape of
+    Just (w, h) -> putStrLn $ "  Ширина: " ++ show w ++ ", высота: " ++ show h
+    Nothing -> return ()) sampleShapes
+
+-- Пример 2: Работа с коллекциями (траверсалы)
+example2 :: IO ()
+example2 = do
+  putStrLn "\nПример 2: Работа с коллекциями (траверсалы)"
+  
+  -- Доступ ко всем сотрудникам компании
+  putStrLn "Имена всех сотрудников:"
+  mapM_ (\person -> putStrLn $ "  " ++ _name person) (_employees sampleCompany)
+  
+  -- Обновление всех сотрудников
+  let olderCompany = sampleCompany {
+        _employees = map (\person -> person { _age = _age person + 1 }) (_employees sampleCompany)
+      }
+  
+  putStrLn "\nВозраст сотрудников после обновления:"
+  mapM_ (\person -> putStrLn $ "  " ++ _name person ++ ": " ++ show (_age person)) 
+        (_employees olderCompany)
+  
+  -- Фильтрация сотрудников
+  let youngEmployees = filter (\person -> _age person < 30) (_employees sampleCompany)
+  
+  putStrLn "\nМолодые сотрудники (до 30 лет):"
+  mapM_ (\person -> putStrLn $ "  " ++ _name person ++ ": " ++ show (_age person)) 
+        youngEmployees
+  
+  -- Доступ к сотрудникам в отделах
+  putStrLn "\nСотрудники по отделам:"
+  mapM_ (\(dept, persons) -> do
+    putStrLn $ "  Отдел: " ++ dept
+    mapM_ (\person -> putStrLn $ "    " ++ _name person) persons)
+    (Map.toList (_departments sampleCompany))
+  
+  -- Обновление всех сотрудников во всех отделах
+  let updatedCompany = sampleCompany {
+        _departments = Map.map (map (\person -> person { _name = map toUpper (_name person) })) 
+                      (_departments sampleCompany)
+      }
+  
+  putStrLn "\nИмена сотрудников в отделах после обновления:"
+  mapM_ (\(dept, persons) -> do
+    putStrLn $ "  Отдел: " ++ dept
+    mapM_ (\person -> putStrLn $ "    " ++ _name person) persons)
+    (Map.toList (_departments updatedCompany))
+
+-- Пример 3: Комбинирование призм и траверсалов
+example3 :: IO ()
+example3 = do
+  putStrLn "\nПример 3: Комбинирование призм и траверсалов"
+  
+  -- Функции для работы с конкретными типами фигур
+  let isCircle :: Shape -> Bool
+      isCircle (Circle _) = True
+      isCircle _ = False
+  
+  let isRectangle :: Shape -> Bool
+      isRectangle (Rectangle _ _) = True
+      isRectangle _ = False
+  
+  let isTriangle :: Shape -> Bool
+      isTriangle (Triangle _ _ _) = True
+      isTriangle _ = False
+  
+  -- Функция для получения площади фигуры
+  let shapeArea :: Shape -> Double
+      shapeArea (Circle r) = pi * r * r
+      shapeArea (Rectangle w h) = w * h
+      shapeArea (Triangle a b c) = 
+        let s = (a + b + c) / 2
+        in sqrt (s * (s - a) * (s - b) * (s - c))
+  
+  -- Вычисление общей площади всех фигур
+  let totalArea = sum (map shapeArea sampleShapes)
+  putStrLn $ "Общая площадь всех фигур: " ++ show totalArea
+  
+  -- Вычисление общей площади по типам фигур
+  let circlesArea = sum (map shapeArea (filter isCircle sampleShapes))
+  let rectanglesArea = sum (map shapeArea (filter isRectangle sampleShapes))
+  let trianglesArea = sum (map shapeArea (filter isTriangle sampleShapes))
+  
+  putStrLn $ "Общая площадь кругов: " ++ show circlesArea
+  putStrLn $ "Общая площадь прямоугольников: " ++ show rectanglesArea
+  putStrLn $ "Общая площадь треугольников: " ++ show trianglesArea
+  
+  -- Функция для увеличения размеров фигуры
+  let scaleShape :: Double -> Shape -> Shape
+      scaleShape factor (Circle r) = Circle (r * factor)
+      scaleShape factor (Rectangle w h) = Rectangle (w * factor) (h * factor)
+      scaleShape factor (Triangle a b c) = Triangle (a * factor) (b * factor) (c * factor)
+  
+  -- Увеличение всех фигур в два раза
+  let scaledShapes = map (scaleShape 2.0) sampleShapes
+  
+  putStrLn "\nПлощади фигур после увеличения в два раза:"
+  mapM_ (\shape -> putStrLn $ "  " ++ show shape ++ ": " ++ show (shapeArea shape)) 
+        scaledShapes
+  
+  -- Общая площадь после увеличения
+  let totalScaledArea = sum (map shapeArea scaledShapes)
+  putStrLn $ "Общая площадь после увеличения: " ++ show totalScaledArea
+  putStrLn $ "Отношение новой площади к старой: " ++ show (totalScaledArea / totalArea)
+
+-- Пример 4: Практическое применение призм и траверсалов
+example4 :: IO ()
+example4 = do
+  putStrLn "\nПример 4: Практическое применение призм и траверсалов"
+  
+  -- Функция для форматирования адреса
+  let formatAddress :: Address -> String
+      formatAddress addr = _street addr ++ ", " ++ _city addr ++ ", " ++ _zipCode addr
+  
+  -- Получение адресов всех сотрудников
+  putStrLn "Адреса всех сотрудников:"
+  mapM_ (\person -> putStrLn $ "  " ++ _name person ++ ": " ++ formatAddress (_address person)) 
+        (_employees sampleCompany)
+  
+  -- Группировка сотрудников по городам
+  let employeesByCity = Map.fromListWith (++) $
+        map (\person -> (_city (_address person), [person])) (_employees sampleCompany)
+  
+  putStrLn "\nСотрудники по городам:"
+  mapM_ (\(city, persons) -> do
+    putStrLn $ "  Город: " ++ city
+    mapM_ (\person -> putStrLn $ "    " ++ _name person) persons)
+    (Map.toList employeesByCity)
+  
+  -- Обновление почтовых индексов для всех сотрудников из Москвы
+  let updateZipCode person =
+        if _city (_address person) == "Москва"
+        then person { _address = (_address person) { _zipCode = "101000" } }
+        else person
+  
+  let updatedCompany = sampleCompany {
+        _employees = map updateZipCode (_employees sampleCompany)
+      }
+  
+  putStrLn "\nАдреса сотрудников после обновления почтовых индексов:"
+  mapM_ (\person -> putStrLn $ "  " ++ _name person ++ ": " ++ formatAddress (_address person)) 
+        (_employees updatedCompany)
 
 -- Главная функция
 main :: IO ()
@@ -449,13 +303,10 @@ main = do
   example2
   example3
   example4
-  example5
-  example6
   
   putStrLn "\nКлючевые моменты о призмах и траверсалах:"
-  putStrLn "1. Призмы - это оптики, которые фокусируются на одном конструкторе алгебраического типа данных"
-  putStrLn "2. Призмы позволяют извлекать данные из значений определенного типа и создавать новые значения"
-  putStrLn "3. Траверсалы - это оптики, которые фокусируются на нуле или более элементах внутри структуры данных"
-  putStrLn "4. Траверсалы позволяют обходить, извлекать и обновлять несколько элементов одновременно"
-  putStrLn "5. Призмы и траверсалы можно комбинировать для работы со сложными структурами данных"
-  putStrLn "6. Библиотека lens предоставляет множество полезных функций для работы с призмами и траверсалами"
+  putStrLn "1. Призмы - это обобщение линз для работы с суммами типов (Either, Maybe, ADT)"
+  putStrLn "2. Траверсалы - это обобщение линз для работы с коллекциями (списки, Map, Set)"
+  putStrLn "3. Призмы и траверсалы можно комбинировать для работы со сложными структурами данных"
+  putStrLn "4. Призмы и траверсалы делают код более декларативным и выразительным"
+  putStrLn "5. В реальных проектах призмы и траверсалы часто используются вместе с линзами"
