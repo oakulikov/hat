@@ -27,39 +27,51 @@ padded_num=$(printf "%02d" $example_num)
 case $example_num in
   1)
     file="01_GADTs.hs"
+    ghc_opts=""
     ;;
   2)
     file="02_TypeLevelProgramming.hs"
+    ghc_opts=""
     ;;
   3)
     file="03_DependentTypes.hs"
+    ghc_opts=""
     ;;
   4)
     file="04_AdvancedTypeClasses.hs"
+    ghc_opts=""
     ;;
   5)
     file="05_FreeMonads.hs"
+    ghc_opts=""
     ;;
   6)
     file="06_ExtensibleEffects.hs"
+    ghc_opts=""
     ;;
   7)
     file="07_MonadMorphisms.hs"
+    ghc_opts=""
     ;;
   8)
     file="08_Comonads.hs"
+    ghc_opts=""
     ;;
   9)
     file="09_AdvancedRecursion.hs"
+    ghc_opts=""
     ;;
   10)
     file="10_AdvancedFunctors.hs"
+    ghc_opts=""
     ;;
   11)
     file="11_AdvancedOptics.hs"
+    ghc_opts=""
     ;;
   12)
     file="12_PerformanceOptimization.hs"
+    ghc_opts="-package deepseq -package time -package ghc-prim -package bytestring -package text -package vector -package parallel"
     ;;
   *)
     echo "Неверный номер примера. Пожалуйста, выберите число от 1 до 12."
@@ -76,11 +88,11 @@ echo "Запуск примера $example_num: $file"
 echo "-----------------------------------"
 
 # Запуск примера с помощью runhaskell (без компиляции)
-runhaskell "$file"
+runhaskell $ghc_opts "$file"
 if [ $? -ne 0 ]; then
   echo "Выполнение не удалось."
   
   # Альтернатива: попробовать с GHCi
   echo "Пробуем с GHCi..."
-  echo "main" | ghci -v0 "$file"
+  echo "main" | ghci -v0 $ghc_opts "$file"
 fi

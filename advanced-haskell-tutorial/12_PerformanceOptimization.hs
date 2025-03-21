@@ -18,11 +18,13 @@ module Main where
 
 import Control.DeepSeq
 import Control.Exception (evaluate)
-import Control.Monad (foldM, when)
+import Control.Monad (foldM, when, forM_, filterM)
+import Control.Parallel (par, pseq)
 import Control.Monad.ST
 import Data.Bits
 import Data.Char (ord)
 import Data.IORef
+import Data.STRef
 import Data.List (foldl')
 import Data.Maybe (fromMaybe)
 import Data.Time.Clock
@@ -48,6 +50,7 @@ import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as VU
 import qualified Data.Vector.Storable as VS
 import qualified Data.Vector.Mutable as VM
+import qualified Data.Vector.Unboxed.Mutable as VUM
 
 -- Часть 1: Понимание ленивости и строгости
 -- ------------------------------------
@@ -298,18 +301,26 @@ countWithIORef xs = do
 sumVectorST :: VU.Vector Int -> Int
 sumVectorST vec = runST $ do
   let n = VU.length vec
-  result <- newIORef 0
+  result <- newSTRef 0
   forM_ [0..n-1] $ \i -> do
     let val = vec VU.! i
-    modifyIORef' result (+ val)
-  readIORef result
+    modifySTRef' result (+ val)
+  readSTRef result
 
 -- Пример 3: Эффективная сортировка с использованием изменяемых векторов
 sortVector :: VU.Vector Int -> VU.Vector Int
-sortVector vec = runST $ do
-  mvec <- VU.thaw vec
-  VM.sort mvec
-  VU.freeze mvec
+sortVector vec = VU.modify sort vec
+  where
+    sort :: VUM.MVector s Int -> ST s ()
+    sort mv = do
+      let n = VUM.length mv
+      forM_ [0..n-2] $ \i ->
+        forM_ [i+1..n-1] $ \j -> do
+          vi <- VUM.read mv i
+          vj <- VUM.read mv j
+          when (vj < vi) $ do
+            VUM.write mv i vj
+            VUM.write mv j vi
 
 -- Часть 9: Практические примеры оптимизации
 -- -------------------------------------
@@ -323,11 +334,10 @@ fibNaive n = fibNaive (n - 1) + fibNaive (n - 2)
 
 -- Оптимизированная реализация с мемоизацией
 fibMemo :: Integer -> Integer
-fibMemo = (map fib [0..] !!)
+fibMemo n = fibs !! (fromIntegral n)
   where
-    fib 0 = 0
-    fib 1 = 1
-    fib n = fibMemo (n - 1) + fibMemo (n - 2)
+    fibs :: [Integer]
+    fibs = 0 : 1 : zipWith (+) fibs (tail fibs)
 
 -- Оптимизированная итеративная реализация
 fibIter :: Integer -> Integer

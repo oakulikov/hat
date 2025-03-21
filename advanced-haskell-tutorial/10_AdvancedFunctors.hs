@@ -17,8 +17,9 @@
 module Main where
 
 import Data.Bifunctor
-import Data.Profunctor
-import Data.Functor.Contravariant
+-- import Data.Profunctor -- Закомментировано, так как требует установки пакета profunctors
+-- Импортируем только нужные типы и функции, чтобы избежать конфликтов имен
+import Data.Functor.Contravariant (Contravariant(..))
 import Data.Functor.Compose
 import Data.Functor.Product
 import Data.Functor.Sum
@@ -26,6 +27,15 @@ import Data.Functor.Identity
 import Data.Functor.Const
 import Control.Arrow
 import Control.Applicative
+
+-- Определяем свой класс Profunctor, чтобы не зависеть от пакета profunctors
+class Profunctor p where
+  dimap :: (a -> b) -> (c -> d) -> p b c -> p a d
+  lmap :: (a -> b) -> p b c -> p a c
+  rmap :: (b -> c) -> p a b -> p a c
+  
+  lmap f = dimap f id
+  rmap = dimap id
 
 -- Часть 1: Обзор стандартных функторов
 -- ---------------------------------
@@ -82,14 +92,20 @@ instance Bifunctor Either' where
   second _ (Left' a) = Left' a
   second g (Right' b) = Right' (g b)
 
--- Пара как бифунктор
-instance Bifunctor (,) where
-  bimap f g (a, b) = (f a, g b)
-  first f (a, b) = (f a, b)
-  second g (a, b) = (a, g b)
+-- Пара как бифунктор (уже определен в Data.Bifunctor)
+-- instance Bifunctor (,) where
+--   bimap f g (a, b) = (f a, g b)
+--   first f (a, b) = (f a, b)
+--   second g (a, b) = (a, g b)
 
 -- Собственный бифунктор
 data These a b = This a | That b | These' a b deriving (Show, Eq)
+
+-- Реализация Functor для These
+instance Functor (These a) where
+  fmap _ (This a) = This a
+  fmap f (That b) = That (f b)
+  fmap f (These' a b) = These' a (f b)
 
 instance Bifunctor These where
   bimap f _ (This a) = This (f a)
@@ -180,12 +196,12 @@ instance Profunctor (->) where
   rmap = (.)
 
 -- Kleisli стрелки как профунктор
-newtype Kleisli m a b = Kleisli { runKleisli :: a -> m b }
+newtype MyKleisli m a b = MyKleisli { runMyKleisli :: a -> m b }
 
-instance Monad m => Profunctor (Kleisli m) where
-  dimap f g (Kleisli h) = Kleisli (fmap g . h . f)
-  lmap f (Kleisli h) = Kleisli (h . f)
-  rmap g (Kleisli h) = Kleisli (fmap g . h)
+instance Monad m => Profunctor (MyKleisli m) where
+  dimap f g (MyKleisli h) = MyKleisli (fmap g . h . f)
+  lmap f (MyKleisli h) = MyKleisli (h . f)
+  rmap g (MyKleisli h) = MyKleisli (fmap g . h)
 
 -- Cokleisli стрелки как профунктор
 newtype Cokleisli w a b = Cokleisli { runCokleisli :: w a -> b }
@@ -391,16 +407,18 @@ example3 :: IO ()
 example3 = do
   putStrLn "\nПример 3: Профункторы"
   
-  let f = dimap (+1) (*2) (*)
-  putStrLn $ "dimap (+1) (*2) (*) applied to (5, 6) = " ++ show (f 5 6)
+  -- Пример использования dimap для функций
+  let f :: Int -> String
+      f = dimap show (++ "!") id
+  putStrLn $ "dimap show (++ \"!\") id applied to 12345 = " ++ f 12345
   
-  let kleisliFunc = Kleisli $ \x -> if x > 0 then Just (x * 2) else Nothing
+  let kleisliFunc = MyKleisli $ \x -> if x > 0 then Just (x * 2) else Nothing
   let dimappedKleisli = dimap (+1) show kleisliFunc
   
-  putStrLn $ "kleisliFunc applied to 5 = " ++ show (runKleisli kleisliFunc 5)
-  putStrLn $ "kleisliFunc applied to -1 = " ++ show (runKleisli kleisliFunc (-1))
-  putStrLn $ "dimappedKleisli applied to 5 = " ++ show (runKleisli dimappedKleisli 5)
-  putStrLn $ "dimappedKleisli applied to -2 = " ++ show (runKleisli dimappedKleisli (-2))
+  putStrLn $ "kleisliFunc applied to 5 = " ++ show (runMyKleisli kleisliFunc 5)
+  putStrLn $ "kleisliFunc applied to -1 = " ++ show (runMyKleisli kleisliFunc (-1))
+  putStrLn $ "dimappedKleisli applied to 5 = " ++ show (runMyKleisli dimappedKleisli 5)
+  putStrLn $ "dimappedKleisli applied to -2 = " ++ show (runMyKleisli dimappedKleisli (-2))
 
 example4 :: IO ()
 example4 = do

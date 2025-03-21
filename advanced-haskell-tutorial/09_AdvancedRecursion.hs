@@ -186,10 +186,9 @@ balancedTree = ana $ \xs ->
 
 -- Создание выражения для вычисления факториала
 factExpr :: Int -> Expr
-factExpr = ana $ \n ->
-  if n <= 1
-    then LitF 1
-    else MulF n (n - 1)
+factExpr n = if n <= 1 
+  then Lit 1
+  else Mul (Lit n) (factExpr (n - 1))
 
 -- Часть 5: Гиломорфизмы (композиция катаморфизма и анаморфизма)
 -- ---------------------------------------------------------
@@ -221,11 +220,19 @@ quicksort = hylo
     partition p1 p2 xs = (filter p1 xs, filter p2 xs)
 
 -- Вычисление чисел Фибоначчи
+data FibF a = FibZero | FibOne | FibNode a a deriving (Functor)
+
 fibonacci :: Int -> Integer
-fibonacci n
-  | n == 0 = 0
-  | n == 1 = 1
-  | otherwise = fibonacci (n - 1) + fibonacci (n - 2)
+fibonacci = hylo alg coalg
+  where
+    alg FibZero = 0
+    alg FibOne = 1
+    alg (FibNode a b) = a + b
+    
+    coalg n
+      | n == 0 = FibZero
+      | n == 1 = FibOne
+      | otherwise = FibNode (n - 1) (n - 2)
 
 -- Часть 6: Парамофизмы и апоморфизмы
 -- -------------------------------
@@ -356,15 +363,21 @@ instance Corecursive AST where
 -- Вычисление AST с использованием окружения
 type Env = [(String, Int)]
 
+-- Вычисление AST с использованием окружения
 evalAST :: Env -> AST -> Int
-evalAST env = cata $ \case
-  ASTLitF n -> n
-  ASTVarF s -> case lookup s env of
-    Just v -> v
-    Nothing -> error $ "Undefined variable: " ++ s
-  ASTAddF a b -> a + b
-  ASTMulF a b -> a * b
-  ASTLetF x e1 e2 -> e2
+evalAST env ast = runEval env ast
+  where
+    runEval :: Env -> AST -> Int
+    runEval env (ASTLit n) = n
+    runEval env (ASTVar s) = case lookup s env of
+      Just v -> v
+      Nothing -> error $ "Undefined variable: " ++ s
+    runEval env (ASTAdd e1 e2) = runEval env e1 + runEval env e2
+    runEval env (ASTMul e1 e2) = runEval env e1 * runEval env e2
+    runEval env (ASTLet x e1 e2) = 
+      let v1 = runEval env e1
+          env' = (x, v1) : env
+      in runEval env' e2
 
 -- Оптимизация AST
 optimizeAST :: AST -> AST
@@ -379,10 +392,11 @@ optimizeAST = cata $ \case
   f -> embed f
   where
     occursIn :: String -> AST -> Bool
-    occursIn x = cata $ \case
-      ASTVarF y -> x == y
-      ASTLetF y _ e2 -> x /= y && e2
-      _ -> False
+    occursIn x (ASTVar y) = x == y
+    occursIn x (ASTLet y e1 e2) = occursIn x e1 || (x /= y && occursIn x e2)
+    occursIn x (ASTAdd e1 e2) = occursIn x e1 || occursIn x e2
+    occursIn x (ASTMul e1 e2) = occursIn x e1 || occursIn x e2
+    occursIn _ _ = False
 
 -- Пример 3: Обработка файловой системы
 data FileSystem

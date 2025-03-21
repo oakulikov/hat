@@ -8,24 +8,23 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE TupleSections #-}
 
 module Main where
 
 import Control.Lens
-import Control.Lens.TH
-import Control.Applicative
-import Data.Monoid
+import Control.Monad.State
 import Data.Char (toUpper)
-import qualified Data.Map as Map
-import qualified Data.Set as Set
-import qualified Data.Text as T
-import qualified Data.Vector as V
+import Data.List (intercalate)
+-- Using association lists instead of Data.Map
+type Map k v = [(k, v)]
+
+-- Functions for Map
+fromList :: [(k, v)] -> Map k v
+fromList = id
+
+empty :: Map k v
+empty = []
 
 -- Часть 1: Обзор оптики
 -- ------------------
@@ -96,22 +95,24 @@ sampleCompany = Company
 -- Продвинутые операции с линзами
 
 -- Композиция линз
-streetOfFirstEmployee :: Lens' Company String
-streetOfFirstEmployee = companyEmployees . _head . personAddress . addressStreet
+streetOfFirstEmployee :: Traversal' Company String
+streetOfFirstEmployee = companyEmployees . ix 0 . personAddress . addressStreet
 
 -- Использование zoom для работы с частью состояния
 updateStreet :: String -> State Person ()
 updateStreet newStreet = zoom personAddress $ do
   addressStreet .= newStreet
 
--- Использование at для работы с Map
-type UserDB = Map.Map Int Person
+-- Работа с Map
+type UserDB = Map Int Person
 
+-- Простая реализация lookup для Map
 lookupUser :: Int -> UserDB -> Maybe Person
-lookupUser userId db = db ^. at userId
+lookupUser userId db = lookup userId db
 
+-- Простая реализация insert для Map
 insertUser :: Int -> Person -> UserDB -> UserDB
-insertUser userId person = at userId ?~ person
+insertUser userId person db = (userId, person) : filter (\(k, _) -> k /= userId) db
 
 -- Использование non для работы с Maybe
 defaultAge :: Lens' (Maybe Int) Int
@@ -166,18 +167,6 @@ doubleCircleRadius = over _Circle (*2)
 -- Использование только для проверки типа
 isCircle :: Shape -> Bool
 isCircle = has _Circle
-
--- Использование призм с Maybe
-_Just' :: Prism (Maybe a) (Maybe b) a b
-_Just' = prism Just $ \case
-  Just a -> Right a
-  Nothing -> Left Nothing
-
--- Использование призм с Either
-_Right' :: Prism (Either a b) (Either a c) b c
-_Right' = prism Right $ \case
-  Right b -> Right b
-  Left a -> Left (Left a)
 
 -- Часть 4: Продвинутые траверсалы
 -- ----------------------------
@@ -240,20 +229,8 @@ maybeToEither = iso toEither fromEither
     fromEither (Left _) = Nothing
     fromEither (Right b) = Just b
 
--- Изоморфизм между функциями и Kleisli стрелками
-kleisliIso :: Monad m => Iso (a -> b) (c -> d) (a -> m b) (c -> m d)
-kleisliIso = iso (fmap return) (>>= id)
-
 -- Часть 6: Продвинутые геттеры и сеттеры
 -- -----------------------------------
-
--- Создание геттера вручную
-_fst :: Getter (a, b) a
-_fst = to fst
-
--- Создание сеттера вручную
-_snd :: Setter (a, b) (a, c) b c
-_snd = sets (\f (a, b) -> (a, f b))
 
 -- Использование to для создания геттеров
 fullName :: Getter Person String
@@ -270,31 +247,26 @@ upperCaseNames = sets (\f ps -> f (over (traverse . personName) (map toUpper) ps
 -- Часть 7: Продвинутые фолды
 -- -----------------------
 
--- Создание фолда вручную
-_sum :: Num a => Fold [a] a
-_sum = folding sum
-
 -- Использование folded для работы с Foldable
 totalAge :: Fold [Person] Int
-totalAge = folding (sum . map _personAge)
+totalAge = folded . personAge
 
 -- Использование filtered с folded
 adultCount :: Fold [Person] Int
-adultCount = folding (length . filter (\p -> _personAge p >= 18))
+adultCount = to (length . filter (\p -> p ^. personAge >= 18))
 
 -- Использование foldMapOf для свертки
 averageAge :: [Person] -> Double
-averageAge ps = getSum totalAge / getSum count
+averageAge ps = fromIntegral (sum ages) / fromIntegral (length ages)
   where
-    totalAge = foldMapOf (traverse . personAge) Sum ps
-    count = foldMapOf (traverse . to (const 1)) Sum ps
+    ages = ps ^.. traverse . personAge
 
 -- Часть 8: Комбинирование различных типов оптики
 -- ------------------------------------------
 
 -- Комбинирование линз и призм
 _firstCircle :: Traversal' [Shape] Double
-_firstCircle = _head . _Circle
+_firstCircle = ix 0 . _Circle
 
 -- Комбинирование линз и траверсалов
 _allEmployeeNames :: Traversal' Company String
@@ -306,7 +278,7 @@ _allCircleRadii = traverse . _Circle
 
 -- Комбинирование линз, призм и траверсалов
 _firstEmployeeAddressIfAdult :: Traversal' Company Address
-_firstEmployeeAddressIfAdult = companyEmployees . _head . filtered (\p -> p ^. personAge >= 18) . personAddress
+_firstEmployeeAddressIfAdult = companyEmployees . ix 0 . filtered (\p -> p ^. personAge >= 18) . personAddress
 
 -- Часть 9: Практические примеры использования оптики
 -- ----------------------------------------------
@@ -314,7 +286,7 @@ _firstEmployeeAddressIfAdult = companyEmployees . _head . filtered (\p -> p ^. p
 -- Пример 1: Работа с вложенными структурами данных
 data Organization = Organization
   { _orgName :: String
-  , _orgDepartments :: Map.Map String Department
+  , _orgDepartments :: Map String Department
   } deriving (Show, Eq)
 
 data Department = Department
@@ -322,16 +294,19 @@ data Department = Department
   , _deptEmployees :: [Person]
   } deriving (Show, Eq)
 
+-- Генерация линз с помощью Template Haskell
 makeLenses ''Organization
 makeLenses ''Department
 
 -- Получение имени руководителя отдела
 getDeptHeadName :: String -> Organization -> Maybe String
-getDeptHeadName deptName org = org ^? orgDepartments . at deptName . _Just . deptHead . personName
+getDeptHeadName deptName org = do
+  dept <- lookup deptName (_orgDepartments org)
+  return $ _personName $ _deptHead dept
 
 -- Обновление возраста всех сотрудников в организации
 incrementAllOrgAges :: Organization -> Organization
-incrementAllOrgAges = over (orgDepartments . traverse . deptEmployees . traverse . personAge) (+1)
+incrementAllOrgAges = over (orgDepartments . traversed . _2 . deptEmployees . traverse . personAge) (+1)
 
 -- Пример 2: Работа с JSON-подобными данными
 data JsonValue
@@ -340,7 +315,7 @@ data JsonValue
   | JsonNumber Double
   | JsonString String
   | JsonArray [JsonValue]
-  | JsonObject (Map.Map String JsonValue)
+  | JsonObject (Map String JsonValue)
   deriving (Show, Eq)
 
 -- Создание призм для JsonValue
@@ -369,18 +344,18 @@ _JsonArray = prism JsonArray $ \case
   JsonArray a -> Right a
   other -> Left other
 
-_JsonObject :: Prism' JsonValue (Map.Map String JsonValue)
+_JsonObject :: Prism' JsonValue (Map String JsonValue)
 _JsonObject = prism JsonObject $ \case
   JsonObject o -> Right o
   other -> Left other
 
 -- Пример данных
 sampleJson :: JsonValue
-sampleJson = JsonObject $ Map.fromList
+sampleJson = JsonObject $ fromList
   [ ("name", JsonString "John")
   , ("age", JsonNumber 30)
   , ("isAdmin", JsonBool True)
-  , ("address", JsonObject $ Map.fromList
+  , ("address", JsonObject $ fromList
       [ ("city", JsonString "New York")
       , ("zip", JsonNumber 10001)
       ])
@@ -393,35 +368,142 @@ sampleJson = JsonObject $ Map.fromList
 -- Получение значения по пути
 getJsonPath :: [String] -> JsonValue -> Maybe JsonValue
 getJsonPath [] json = Just json
-getJsonPath (key:keys) json = json ^? _JsonObject . at key . _Just >>= getJsonPath keys
+getJsonPath (key:keys) json = case json of
+  JsonObject obj -> do
+    value <- lookup key obj
+    getJsonPath keys value
+  _ -> Nothing
 
 -- Обновление значения по пути
 updateJsonPath :: [String] -> (JsonValue -> JsonValue) -> JsonValue -> JsonValue
 updateJsonPath [] f json = f json
-updateJsonPath (key:keys) f json = json & _JsonObject . at key . _Just %~ updateJsonPath keys f
+updateJsonPath (key:keys) f json = case json of
+  JsonObject obj -> 
+    let updateObj = map (\(k, v) -> if k == key 
+                                    then (k, updateJsonPath keys f v) 
+                                    else (k, v)) obj
+    in JsonObject updateObj
+  _ -> json
 
 -- Пример 3: Работа с линзами в монадическом контексте
 data AppState = AppState
-  { _appUsers :: Map.Map Int Person
+  { _appUsers :: Map Int Person
   , _appCurrentUser :: Maybe Int
-  , _appSettings :: Map.Map String String
+  , _appSettings :: Map String String
   } deriving (Show, Eq)
 
+-- Генерация линз с помощью Template Haskell
 makeLenses ''AppState
 
 -- Получение текущего пользователя
 getCurrentUser :: AppState -> Maybe Person
-getCurrentUser state = state ^? appCurrentUser . _Just >>= \userId -> state ^? appUsers . at userId . _Just
+getCurrentUser state = do
+  userId <- _appCurrentUser state
+  lookup userId (_appUsers state)
 
 -- Обновление настроек в монадическом контексте
 updateSettings :: String -> String -> State AppState ()
-updateSettings key value = appSettings . at key ?= value
+updateSettings key value = do
+  settings <- use appSettings
+  appSettings .= ((key, value) : filter (\(k, _) -> k /= key) settings)
 
 -- Обновление текущего пользователя в монадическом контексте
 updateCurrentUser :: Int -> State AppState (Maybe Person)
 updateCurrentUser userId = do
   appCurrentUser .= Just userId
-  use $ appUsers . at userId
+  users <- use appUsers
+  return $ lookup userId users
+
+-- Часть 10: Продвинутые техники с линзами
+-- -----------------------------------
+
+-- Использование Indexed Traversal
+-- Позволяет получить доступ к индексу при обходе структуры
+indexedEmployees :: IndexedTraversal' Int Company Person
+indexedEmployees = companyEmployees . traversed
+
+-- Использование Indexed Fold
+-- Позволяет получить доступ к индексу при свертке структуры
+employeeWithIndex :: Company -> [(Int, Person)]
+employeeWithIndex company = itoListOf indexedEmployees company
+
+-- Использование Prisms с Either
+eitherToMaybe :: Prism' (Either a b) b
+eitherToMaybe = prism Right $ \case
+  Right b -> Right b
+  Left _ -> Left (Left undefined)
+
+-- Использование Lenses с Zippers
+-- Zippers позволяют перемещаться по структуре данных и модифицировать ее
+-- Упрощенная реализация Zipper для дерева
+data TreeZipper a = TreeZipper
+  { _focus :: Tree a
+  , _path :: [Either (Tree a) (Tree a)]
+  } deriving (Show, Eq)
+
+-- Функция для создания Zipper из дерева
+treeZipper :: Tree a -> TreeZipper a
+treeZipper t = TreeZipper t []
+
+-- Функция для перемещения вниз по левой ветке
+moveLeft :: TreeZipper a -> Maybe (TreeZipper a)
+moveLeft (TreeZipper (Node l r) path) = Just $ TreeZipper l (Left r : path)
+moveLeft _ = Nothing
+
+-- Функция для перемещения вниз по правой ветке
+moveRight :: TreeZipper a -> Maybe (TreeZipper a)
+moveRight (TreeZipper (Node l r) path) = Just $ TreeZipper r (Right l : path)
+moveRight _ = Nothing
+
+-- Функция для перемещения вверх по дереву
+moveUp :: TreeZipper a -> Maybe (TreeZipper a)
+moveUp (TreeZipper t (Left r : path)) = Just $ TreeZipper (Node t r) path
+moveUp (TreeZipper t (Right l : path)) = Just $ TreeZipper (Node l t) path
+moveUp _ = Nothing
+
+-- Функция для модификации текущего узла
+modifyFocus :: (Tree a -> Tree a) -> TreeZipper a -> TreeZipper a
+modifyFocus f (TreeZipper t path) = TreeZipper (f t) path
+
+-- Функция для получения дерева из Zipper
+fromZipper :: TreeZipper a -> Tree a
+fromZipper (TreeZipper t []) = t
+fromZipper z = case moveUp z of
+  Just z' -> fromZipper z'
+  Nothing -> _focus z
+
+-- Часть 11: Продвинутые комбинаторы линз
+-- ----------------------------------
+
+-- Использование alongside для работы с двумя структурами одновременно
+combineTwoPersons :: (Person, Person) -> (String, String)
+combineTwoPersons = view (alongside personName personName)
+
+-- Использование choosing для выбора между двумя структурами
+chooseNameOrCity :: Either Person Address -> String
+chooseNameOrCity = view (choosing personName addressCity)
+
+-- Использование map для работы с контейнерами
+mapPersonNames :: [Person] -> [String]
+mapPersonNames = map (view personName)
+
+-- Использование singular для работы с одним элементом
+firstPersonName :: [Person] -> Maybe String
+firstPersonName = preview (singular traverse . personName)
+
+-- Часть 12: Линзы и типы-функции
+-- -------------------------
+
+-- Использование Lens с типами-функциями
+type Predicate a = a -> Bool
+
+-- Линза для доступа к предикату
+predicate :: Lens' (Predicate a) (a -> Bool)
+predicate = lens id const
+
+-- Модификация предиката
+negatePredicate :: Predicate a -> Predicate a
+negatePredicate = over predicate (\f -> not . f)
 
 -- Примеры для демонстрации
 example1 :: IO ()
@@ -444,7 +526,7 @@ example1 = do
   let street = sampleCompany ^. streetOfFirstEmployee
   putStrLn $ "\nУлица первого сотрудника: " ++ street
   
-  let userDB = Map.fromList [(1, samplePerson)]
+  let userDB = fromList [(1, samplePerson)]
   let user = lookupUser 1 userDB
   putStrLn $ "\nПользователь с ID 1: " ++ show user
   
@@ -464,20 +546,20 @@ example2 = do
   let shape = Circle 5.0
   putStrLn $ "Это круг? " ++ show (isCircle shape)
   
-  let maybeValue = Just 42 ^? _Just'
+  let maybeValue = Just 42 ^? _Just
   putStrLn $ "Значение из Just 42: " ++ show maybeValue
   
-  let eitherValue = Right 42 ^? _Right'
+  let eitherValue = Right 42 ^? _Right
   putStrLn $ "Значение из Right 42: " ++ show eitherValue
 
 example3 :: IO ()
 example3 = do
   putStrLn "\nПример 3: Продвинутые траверсалы"
   
-  let leafValues = sampleTree ^.. allLeaves
+  let leafValues = toListOf allLeaves sampleTree
   putStrLn $ "Значения листьев: " ++ show leafValues
   
-  let incrementedTree = sampleTree & allLeaves %~ (+10)
+  let incrementedTree = over allLeaves (+10) sampleTree
   putStrLn $ "Дерево с увеличенными значениями: " ++ show incrementedTree
   
   let sum = sumTree sampleTree
@@ -490,7 +572,7 @@ example4 :: IO ()
 example4 = do
   putStrLn "\nПример 4: Практические примеры"
   
-  let org = Organization "Example Corp" $ Map.fromList
+  let org = Organization "Example Corp" $ fromList
         [ ("IT", Department samplePerson [])
         , ("HR", Department (Person "HR Manager" 40 (Address "HR St" "HR City" "12345")) [])
         ]
@@ -504,9 +586,27 @@ example4 = do
   let updatedJson = updateJsonPath ["age"] (const (JsonNumber 31)) sampleJson
   putStrLn $ "Обновленный возраст в JSON: " ++ show (getJsonPath ["age"] updatedJson)
   
-  let appState = AppState (Map.fromList [(1, samplePerson)]) (Just 1) Map.empty
+  let appState = AppState (fromList [(1, samplePerson)]) (Just 1) empty
   let currentUser = getCurrentUser appState
   putStrLn $ "Текущий пользователь: " ++ show currentUser
+
+example5 :: IO ()
+example5 = do
+  putStrLn "\nПример 5: Продвинутые техники с линзами"
+  
+  let employeesWithIndex = employeeWithIndex sampleCompany
+  putStrLn $ "Сотрудники с индексами: " ++ show (map fst employeesWithIndex)
+  
+  let isEven = negatePredicate odd
+  putStrLn $ "Проверка на четность числа 4: " ++ show (isEven 4)
+  putStrLn $ "Проверка на четность числа 5: " ++ show (isEven 5)
+  
+  let twoPersons = (samplePerson, samplePerson & personName .~ "Петр")
+  let names = combineTwoPersons twoPersons
+  putStrLn $ "Имена двух сотрудников: " ++ show names
+  
+  let firstPerson = firstPersonName (sampleCompany ^. companyEmployees)
+  putStrLn $ "Имя первого сотрудника: " ++ show firstPerson
 
 -- Главная функция
 main :: IO ()
@@ -517,6 +617,7 @@ main = do
   example2
   example3
   example4
+  example5
   
   putStrLn "\nКлючевые моменты о продвинутой оптике:"
   putStrLn "1. Линзы позволяют получать и изменять поля в произведениях типов"
@@ -527,3 +628,5 @@ main = do
   putStrLn "6. Фолды позволяют свертывать несколько элементов"
   putStrLn "7. Различные типы оптики можно комбинировать с помощью композиции"
   putStrLn "8. Оптика особенно полезна при работе со сложными вложенными структурами данных"
+  putStrLn "9. Продвинутые техники, такие как Indexed Traversal и Zippers, расширяют возможности оптики"
+  putStrLn "10. Линзы могут работать с типами-функциями и другими сложными структурами данных"
