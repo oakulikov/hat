@@ -11,15 +11,15 @@
 Основные концепции языка Haskell, необходимые для понимания функционального программирования.
 
 - [Типы данных и классы типов](haskell-basics-tutorial/01_TypesAndTypeClasses.hs) - Основные типы данных, определение собственных типов, классы типов
-- [Сопоставление с образцом](haskell-basics-tutorial/02_PatternMatching.hs) - Использование сопоставления с образцом для разбора структур данных
-- [Списки и рекурсия](haskell-basics-tutorial/03_ListsAndRecursion.hs) - Работа со списками и рекурсивные функции
-- [Ленивые вычисления](haskell-basics-tutorial/04_LazyEvaluation.hs) - Ленивые вычисления и бесконечные структуры данных
-- [Функции высших порядков](haskell-basics-tutorial/05_HigherOrderFunctions.hs) - Функции, принимающие или возвращающие другие функции
-- [Каррирование](haskell-basics-tutorial/06_Currying.hs) - Частичное применение функций и каррирование
-- [Моноиды](haskell-basics-tutorial/07_Monoids.hs) - Моноиды и их применение в функциональном программировании
-- [Кортежи и синтаксис функций](haskell-basics-tutorial/08_TuplesAndFunctionSyntax.hs) - Работа с кортежами и различные способы определения функций
-- [Интервалы и генераторы списков](haskell-basics-tutorial/09_IntervalsAndListGenerators.hs) - Создание и работа с интервалами и генераторами списков
-- [Свёртка](haskell-basics-tutorial/10_Folding.hs) - Свёртка (folding) и её применение для обработки структур данных
+- [Синтаксис функций](haskell-basics-tutorial/02_FunctionSyntax.hs) - Различные способы определения функций в Haskell
+- [Функции высших порядков](haskell-basics-tutorial/03_HigherOrderFunctions.hs) - Функции, принимающие или возвращающие другие функции
+- [Каррирование](haskell-basics-tutorial/04_Currying.hs) - Частичное применение функций и каррирование
+- [Сопоставление с образцом](haskell-basics-tutorial/05_PatternMatching.hs) - Использование сопоставления с образцом для разбора структур данных
+- [Интервалы и генераторы списков](haskell-basics-tutorial/06_IntervalsAndListGenerators.hs) - Создание и работа с интервалами и генераторами списков
+- [Списки и рекурсия](haskell-basics-tutorial/07_ListsAndRecursion.hs) - Работа со списками и рекурсивные функции
+- [Свёртка](haskell-basics-tutorial/08_Folding.hs) - Свёртка (folding) и её применение для обработки структур данных
+- [Ленивые вычисления](haskell-basics-tutorial/09_LazyEvaluation.hs) - Ленивые вычисления и бесконечные структуры данных
+- [Моноиды](haskell-basics-tutorial/10_Monoids.hs) - Моноиды и их применение в функциональном программировании
 
 ### 2. Учебное пособие по функторам (functor-tutorial/)
 
