@@ -276,25 +276,59 @@ findMinMax (x:xs) =
   let (min, max) = findMinMax xs
   in (if x < min then x else min, if x > max then x else max)
 
--- Функции для работы с кортежами
+-- Реализация функций для работы с кортежами
+
+-- Реализация функции zip
+-- zip объединяет два списка в список пар
+myZip :: [a] -> [b] -> [(a, b)]
+myZip [] _ = []
+myZip _ [] = []
+myZip (x:xs) (y:ys) = (x, y) : myZip xs ys
+
+-- Реализация функции unzip
+-- unzip разделяет список пар на пару списков
+myUnzip :: [(a, b)] -> ([a], [b])
+myUnzip [] = ([], [])
+myUnzip ((x, y):xys) = 
+  let (xs, ys) = myUnzip xys
+  in (x:xs, y:ys)
+
+-- Реализация функции zipWith
+-- zipWith применяет функцию к соответствующим элементам двух списков
+myZipWith :: (a -> b -> c) -> [a] -> [b] -> [c]
+myZipWith _ [] _ = []
+myZipWith _ _ [] = []
+myZipWith f (x:xs) (y:ys) = f x y : myZipWith f xs ys
+
+-- Реализация функции curry
+-- curry преобразует функцию, принимающую пару, в функцию двух аргументов
+myCurry :: ((a, b) -> c) -> a -> b -> c
+myCurry f x y = f (x, y)
+
+-- Реализация функции uncurry
+-- uncurry преобразует функцию двух аргументов в функцию, принимающую пару
+myUncurry :: (a -> b -> c) -> (a, b) -> c
+myUncurry f (x, y) = f x y
+
+-- Примеры использования наших реализаций
 zipExample :: [(Int, Char)]
-zipExample = zip [1, 2, 3] ['a', 'b', 'c']  -- [(1,'a'), (2,'b'), (3,'c')]
+zipExample = myZip [1, 2, 3] ['a', 'b', 'c']  -- [(1,'a'), (2,'b'), (3,'c')]
 
 unzipExample :: ([Int], [Char])
-unzipExample = unzip zipExample  -- ([1, 2, 3], "abc")
+unzipExample = myUnzip zipExample  -- ([1, 2, 3], "abc")
 
 zipWithExample :: [Int]
-zipWithExample = zipWith (+) [1, 2, 3] [4, 5, 6]  -- [5, 7, 9]
+zipWithExample = myZipWith (+) [1, 2, 3] [4, 5, 6]  -- [5, 7, 9]
 
 -- Функции curry и uncurry
 addPairExample :: (Int, Int) -> Int
 addPairExample (x, y) = x + y
 
 curriedAddExample :: Int -> Int -> Int
-curriedAddExample = curry addPairExample
+curriedAddExample = myCurry addPairExample
 
 uncurriedAddExample :: (Int, Int) -> Int
-uncurriedAddExample = uncurry (+)
+uncurriedAddExample = myUncurry (+)
 
 -- Пример 5: Кортежи
 example5 :: IO ()
