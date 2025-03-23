@@ -232,6 +232,97 @@ example4 = do
   putStrLn $ "show Red: " ++ show Red
   putStrLn $ "show (Circle 5.0): " ++ show (Circle 5.0)
 
+-- Кортежи (Tuples)
+
+-- Кортеж (tuple) - это упорядоченная коллекция элементов фиксированной длины,
+-- которые могут иметь разные типы.
+
+-- Создание кортежей
+examplePair :: (Int, String)
+examplePair = (42, "Hello")
+
+exampleTriple :: (Int, String, Bool)
+exampleTriple = (42, "Hello", True)
+
+-- Кортеж из одного элемента не существует, (x) - это просто x в скобках
+-- Кортеж из нуля элементов - это тип (), называемый "unit"
+exampleUnit :: ()
+exampleUnit = ()
+
+-- Доступ к элементам кортежа
+
+-- Для пар (кортежей из двух элементов) есть стандартные функции fst и snd
+firstFromPair :: Int
+firstFromPair = fst (42, "Hello")  -- 42
+
+secondFromPair :: String
+secondFromPair = snd (42, "Hello")  -- "Hello"
+
+-- Для кортежей большей длины нужно использовать сопоставление с образцом
+getFirstFromTriple :: (a, b, c) -> a
+getFirstFromTriple (x, _, _) = x
+
+getSecondFromTriple :: (a, b, c) -> b
+getSecondFromTriple (_, y, _) = y
+
+getThirdFromTriple :: (a, b, c) -> c
+getThirdFromTriple (_, _, z) = z
+
+-- Использование кортежей для возврата нескольких значений из функции
+findMinMax :: [Int] -> (Int, Int)
+findMinMax [] = error "Пустой список"
+findMinMax [x] = (x, x)
+findMinMax (x:xs) =
+  let (min, max) = findMinMax xs
+  in (if x < min then x else min, if x > max then x else max)
+
+-- Функции для работы с кортежами
+zipExample :: [(Int, Char)]
+zipExample = zip [1, 2, 3] ['a', 'b', 'c']  -- [(1,'a'), (2,'b'), (3,'c')]
+
+unzipExample :: ([Int], [Char])
+unzipExample = unzip zipExample  -- ([1, 2, 3], "abc")
+
+zipWithExample :: [Int]
+zipWithExample = zipWith (+) [1, 2, 3] [4, 5, 6]  -- [5, 7, 9]
+
+-- Функции curry и uncurry
+addPairExample :: (Int, Int) -> Int
+addPairExample (x, y) = x + y
+
+curriedAddExample :: Int -> Int -> Int
+curriedAddExample = curry addPairExample
+
+uncurriedAddExample :: (Int, Int) -> Int
+uncurriedAddExample = uncurry (+)
+
+-- Пример 5: Кортежи
+example5 :: IO ()
+example5 = do
+  putStrLn "\nПример 5: Кортежи"
+  
+  putStrLn $ "Пара: " ++ show examplePair
+  putStrLn $ "Тройка: " ++ show exampleTriple
+  putStrLn $ "Unit: " ++ show exampleUnit
+  
+  putStrLn $ "Первый элемент пары: " ++ show firstFromPair
+  putStrLn $ "Второй элемент пары: " ++ show secondFromPair
+  
+  putStrLn $ "Первый элемент тройки: " ++ show (getFirstFromTriple exampleTriple)
+  putStrLn $ "Второй элемент тройки: " ++ show (getSecondFromTriple exampleTriple)
+  putStrLn $ "Третий элемент тройки: " ++ show (getThirdFromTriple exampleTriple)
+  
+  let list = [3, 1, 4, 1, 5, 9, 2, 6, 5]
+  putStrLn $ "Минимум и максимум списка " ++ show list ++ ": " ++ show (findMinMax list)
+  
+  putStrLn $ "zip [1, 2, 3] ['a', 'b', 'c']: " ++ show zipExample
+  putStrLn $ "unzip " ++ show zipExample ++ ": " ++ show unzipExample
+  putStrLn $ "zipWith (+) [1, 2, 3] [4, 5, 6]: " ++ show zipWithExample
+  
+  putStrLn $ "addPairExample (3, 4): " ++ show (addPairExample (3, 4))
+  putStrLn $ "curriedAddExample 3 4: " ++ show (curriedAddExample 3 4)
+  putStrLn $ "uncurriedAddExample (3, 4): " ++ show (uncurriedAddExample (3, 4))
+
 -- Главная функция
 main :: IO ()
 main = do
@@ -241,6 +332,7 @@ main = do
   example2
   example3
   example4
+  example5
   
   putStrLn "\nКлючевые моменты о типах данных и классах типов:"
   putStrLn "1. Haskell имеет сильную статическую систему типов с выводом типов"
@@ -253,3 +345,12 @@ main = do
   putStrLn "8. Классы типов определяют интерфейсы, которые могут быть реализованы разными типами"
   putStrLn "9. Стандартные классы типов включают Eq, Ord, Show, Read, Num и другие"
   putStrLn "10. Можно определять собственные классы типов и реализации для существующих типов"
+  
+  putStrLn "\nКлючевые моменты о кортежах:"
+  putStrLn "1. Кортеж - это упорядоченная коллекция элементов фиксированной длины, которые могут иметь разные типы"
+  putStrLn "2. Кортежи создаются с помощью круглых скобок и запятых: (1, \"hello\", True)"
+  putStrLn "3. Тип кортежа - это кортеж типов его элементов: (Int, String, Bool)"
+  putStrLn "4. Для доступа к элементам кортежа можно использовать функции fst и snd (для пар) или сопоставление с образцом"
+  putStrLn "5. Кортежи часто используются для возврата нескольких значений из функции"
+  putStrLn "6. Функции zip, unzip и zipWith работают с кортежами и списками"
+  putStrLn "7. Функции curry и uncurry преобразуют между функциями, принимающими пару, и функциями двух аргументов"
