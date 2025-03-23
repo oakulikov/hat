@@ -259,7 +259,7 @@ secondFromPair :: String
 secondFromPair = snd (42, "Hello")  -- "Hello"
 
 -- Для кортежей большей длины нужно использовать сопоставление с образцом
--- (подробнее о сопоставлении с образцом см. в файле [05_PatternMatching.hs](05_PatternMatching.hs))
+-- (подробнее о сопоставлении с образцом см. в файле 05_PatternMatching.hs)
 getFirstFromTriple :: (a, b, c) -> a
 getFirstFromTriple (x, _, _) = x
 
