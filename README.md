@@ -16,6 +16,10 @@
 - [Ленивые вычисления](haskell-basics-tutorial/04_LazyEvaluation.hs) - Ленивые вычисления и бесконечные структуры данных
 - [Функции высших порядков](haskell-basics-tutorial/05_HigherOrderFunctions.hs) - Функции, принимающие или возвращающие другие функции
 - [Каррирование](haskell-basics-tutorial/06_Currying.hs) - Частичное применение функций и каррирование
+- [Моноиды](haskell-basics-tutorial/07_Monoids.hs) - Моноиды и их применение в функциональном программировании
+- [Кортежи и синтаксис функций](haskell-basics-tutorial/08_TuplesAndFunctionSyntax.hs) - Работа с кортежами и различные способы определения функций
+- [Интервалы и генераторы списков](haskell-basics-tutorial/09_IntervalsAndListGenerators.hs) - Создание и работа с интервалами и генераторами списков
+- [Свёртка](haskell-basics-tutorial/10_Folding.hs) - Свёртка (folding) и её применение для обработки структур данных
 
 ### 2. Учебное пособие по функторам (functor-tutorial/)
 

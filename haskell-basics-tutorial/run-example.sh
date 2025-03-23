@@ -18,6 +18,10 @@ case $EXAMPLE_NUM in
   4) FILE="04_LazyEvaluation.hs" ;;
   5) FILE="05_HigherOrderFunctions.hs" ;;
   6) FILE="06_Currying.hs" ;;
+  7) FILE="07_Monoids.hs" ;;
+  8) FILE="08_TuplesAndFunctionSyntax.hs" ;;
+  9) FILE="09_IntervalsAndListGenerators.hs" ;;
+  10) FILE="10_Folding.hs" ;;
   *) echo "Неверный номер примера: $EXAMPLE_NUM"; exit 1 ;;
 esac
 
