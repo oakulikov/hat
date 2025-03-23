@@ -259,6 +259,7 @@ secondFromPair :: String
 secondFromPair = snd (42, "Hello")  -- "Hello"
 
 -- Для кортежей большей длины нужно использовать сопоставление с образцом
+-- (подробнее о сопоставлении с образцом см. в файле [05_PatternMatching.hs](05_PatternMatching.hs))
 getFirstFromTriple :: (a, b, c) -> a
 getFirstFromTriple (x, _, _) = x
 
@@ -272,7 +273,7 @@ getThirdFromTriple (_, _, z) = z
 findMinMax :: [Int] -> (Int, Int)
 findMinMax [] = error "Пустой список"
 findMinMax [x] = (x, x)
-findMinMax (x:xs) =
+findMinMax (x:xs) = -- Здесь используется сопоставление с образцом
   let (min, max) = findMinMax xs
   in (if x < min then x else min, if x > max then x else max)
 
@@ -281,24 +282,24 @@ findMinMax (x:xs) =
 -- Реализация функции zip
 -- zip объединяет два списка в список пар
 myZip :: [a] -> [b] -> [(a, b)]
-myZip [] _ = []
+myZip [] _ = []  -- Сопоставление с образцом
 myZip _ [] = []
-myZip (x:xs) (y:ys) = (x, y) : myZip xs ys
+myZip (x:xs) (y:ys) = (x, y) : myZip xs ys  -- Сопоставление с образцом для списков
 
 -- Реализация функции unzip
 -- unzip разделяет список пар на пару списков
 myUnzip :: [(a, b)] -> ([a], [b])
-myUnzip [] = ([], [])
-myUnzip ((x, y):xys) = 
+myUnzip [] = ([], [])  -- Сопоставление с образцом
+myUnzip ((x, y):xys) = -- Сопоставление с образцом для списка пар
   let (xs, ys) = myUnzip xys
   in (x:xs, y:ys)
 
 -- Реализация функции zipWith
 -- zipWith применяет функцию к соответствующим элементам двух списков
 myZipWith :: (a -> b -> c) -> [a] -> [b] -> [c]
-myZipWith _ [] _ = []
+myZipWith _ [] _ = []  -- Сопоставление с образцом
 myZipWith _ _ [] = []
-myZipWith f (x:xs) (y:ys) = f x y : myZipWith f xs ys
+myZipWith f (x:xs) (y:ys) = f x y : myZipWith f xs ys  -- Сопоставление с образцом для списков
 
 -- Реализация функции curry
 -- curry преобразует функцию, принимающую пару, в функцию двух аргументов
@@ -308,7 +309,7 @@ myCurry f x y = f (x, y)
 -- Реализация функции uncurry
 -- uncurry преобразует функцию двух аргументов в функцию, принимающую пару
 myUncurry :: (a -> b -> c) -> (a, b) -> c
-myUncurry f (x, y) = f x y
+myUncurry f (x, y) = f x y  -- Сопоставление с образцом для пары
 
 -- Примеры использования наших реализаций
 zipExample :: [(Int, Char)]
@@ -322,7 +323,7 @@ zipWithExample = myZipWith (+) [1, 2, 3] [4, 5, 6]  -- [5, 7, 9]
 
 -- Функции curry и uncurry
 addPairExample :: (Int, Int) -> Int
-addPairExample (x, y) = x + y
+addPairExample (x, y) = x + y  -- Сопоставление с образцом для пары
 
 curriedAddExample :: Int -> Int -> Int
 curriedAddExample = myCurry addPairExample
