@@ -20,6 +20,7 @@
 - [Свёртка](haskell-basics-tutorial/08_Folding.hs) - Свёртка (folding) и её применение для обработки структур данных
 - [Ленивые вычисления](haskell-basics-tutorial/09_LazyEvaluation.hs) - Ленивые вычисления и бесконечные структуры данных
 - [Моноиды](haskell-basics-tutorial/10_Monoids.hs) - Моноиды и их применение в функциональном программировании
+- [Интересные решения известных задач](haskell-basics-tutorial/11_InterestingSolutions.hs) - Элегантные решения классических алгоритмических задач на Haskell
 
 ### 2. Учебное пособие по функторам (functor-tutorial/)
 
