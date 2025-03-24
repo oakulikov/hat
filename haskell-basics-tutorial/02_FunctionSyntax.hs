@@ -104,7 +104,7 @@ multiComposed = (* 2) . (+ 1) . (^ 2) . (+ 3)  -- \x -> ((x + 3)^2 + 1) * 2
 
 -- Композиция с функциями, принимающими несколько аргументов
 composedMultiArg :: Int -> Int -> Int
-composedMultiArg x y = (+ 1) ((x * y))  -- \x y -> (x * y) + 1
+composedMultiArg x y = (+ 1) (x * y)  -- \x y -> (x * y) + 1
 
 -- Пример 8: Определение функций с использованием точечного стиля (point-free style)
 
