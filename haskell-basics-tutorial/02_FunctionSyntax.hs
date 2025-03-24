@@ -58,6 +58,7 @@ makeAdder :: Int -> (Int -> Int)
 makeAdder n = \x -> n + x
 
 -- Использование лямбда-выражения в функции высшего порядка
+-- (подробнее о функциях высшего порядка см. в файле 03_HigherOrderFunctions.hs)
 squareList :: [Int] -> [Int]
 squareList = map (\x -> x * x)
 
