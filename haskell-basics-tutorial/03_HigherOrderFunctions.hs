@@ -33,6 +33,7 @@ filterExample2 :: [String]
 filterExample2 = filter ((> 3) . length) ["a", "ab", "abc", "abcd", "abcde"]  -- ["abcd", "abcde"]
 
 -- foldl - свертка списка слева
+-- (подробнее о свертках см. в файле 08_Folding.hs)
 foldlExample1 :: Int
 foldlExample1 = foldl (+) 0 [1, 2, 3, 4, 5]  -- 15
 
